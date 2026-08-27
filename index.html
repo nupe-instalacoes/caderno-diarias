@@ -28,8 +28,9 @@
     --shadow: 0 2px 0 rgba(13,13,13,0.08), 0 8px 20px -12px rgba(13,13,13,0.35);
   }
   *{box-sizing:border-box;}
+  html{ height:100%; }
   html,body{
-    margin:0; padding:0; height:100%;
+    margin:0; padding:0;
     background:
       linear-gradient(var(--paper), var(--paper));
     font-family:'Inter', system-ui, sans-serif;
@@ -38,8 +39,8 @@
   }
   body{
     background-color:var(--paper);
-    min-height:100vh;
-    padding-bottom:84px;
+    min-height:100%;
+    padding-bottom:140px;
   }
   header.top{
     padding:20px 20px 16px;
@@ -196,9 +197,14 @@
     background:rgba(242,68,5,0.08);
     padding:5px 8px; border-radius:6px;
   }
+  .entry-row .acoes{ display:flex; align-items:center; gap:4px; flex-shrink:0; }
+  .entry-row .edit{
+    background:none;border:none;color:var(--ink);font-size:16px;cursor:pointer;
+    padding:4px 6px; line-height:1;
+  }
   .entry-row .del{
     background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;
-    padding:2px 4px; line-height:1;
+    padding:4px 6px; line-height:1;
   }
   .empty{
     text-align:center; color:var(--ink-soft); font-size:13.5px; padding:14px 4px;
@@ -207,11 +213,14 @@
   .worker-row{
     display:flex; align-items:center; justify-content:space-between;
     padding:10px 0; border-bottom:1px dashed var(--line);
+    gap:8px;
   }
   .worker-row:last-child{ border-bottom:none; }
   .worker-row .name{ font-weight:600; font-size:14.5px; }
   .worker-row .rate{ font-family:'IBM Plex Mono', monospace; font-size:13.5px; color:var(--ink-soft); }
-  .worker-row .del{ background:none;border:none;color:var(--danger);font-size:17px;cursor:pointer; margin-left:10px; }
+  .worker-row .acoes{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .worker-row .edit{ background:none;border:none;color:var(--ink); font-size:16px;cursor:pointer; padding:4px 6px; }
+  .worker-row .del{ background:none;border:none;color:var(--danger);font-size:17px;cursor:pointer; padding:4px 6px; }
 
   .summary-row{
     display:flex; flex-direction:column;
@@ -437,13 +446,23 @@
   <!-- VIEW: LANÇAR -->
   <section id="view-lancar" class="view active">
     <div class="card">
-      <h2><span class="num">1</span> Novo lançamento</h2>
+      <h2><span class="num">1</span> <span id="lanc-form-titulo">Novo lançamento</span></h2>
 
       <label for="f-data">Data</label>
       <input type="date" id="f-data">
 
-      <label for="f-funcionario">Funcionário</label>
-      <select id="f-funcionario"></select>
+      <label for="f-funcionario-input">Colaborador</label>
+      <input type="text" id="f-funcionario-input" list="lista-colaboradores-datalist" placeholder="Digite ou selecione o nome" autocomplete="off">
+      <datalist id="lista-colaboradores-datalist"></datalist>
+
+      <div id="novo-colaborador-box" style="display:none;">
+        <label for="f-nova-funcao">Função do novo colaborador (opcional)</label>
+        <input type="text" id="f-nova-funcao" placeholder="Ex: Pedreiro, Servente...">
+        <label for="f-novo-valor">Valor da diária deste novo colaborador (R$)</label>
+        <input type="number" id="f-novo-valor" placeholder="Ex: 150" min="0" step="0.01">
+      </div>
+
+      <div id="ultimo-lancamento-box" style="display:none;" class="badge-shared"></div>
 
       <label for="f-obra">Obra</label>
       <select id="f-obra"><option value="">— nenhuma —</option></select>
@@ -459,6 +478,7 @@
       <input type="text" id="f-obs" placeholder="Ex: chegou 1h atrasado">
 
       <button class="primary" id="btn-salvar">Registrar</button>
+      <button class="secondary" id="btn-cancelar-edicao-lancamento" style="display:none;">Cancelar edição</button>
       <div class="note" id="sem-funcionario" style="display:none;color:var(--danger);">Cadastre pelo menos um funcionário na aba Equipe antes de lançar.</div>
     </div>
 
@@ -481,14 +501,17 @@
       <div id="lista-obras"><div class="empty">Nenhuma obra cadastrada.</div></div>
     </div>
     <div class="card">
-      <h2><span class="num">3</span> Adicionar funcionário</h2>
+      <h2><span class="num">3</span> <span id="w-form-titulo">Adicionar funcionário</span></h2>
       <label for="w-nome">Nome</label>
       <input type="text" id="w-nome" placeholder="Nome do funcionário">
+      <label for="w-funcao">Função</label>
+      <input type="text" id="w-funcao" placeholder="Ex: Pedreiro, Servente, Eletricista...">
       <label for="w-valor">Valor da diária (R$)</label>
       <input type="number" id="w-valor" placeholder="Ex: 150" min="0" step="0.01">
       <label for="w-obra">Obra atual (opcional)</label>
       <select id="w-obra"><option value="">— nenhuma —</option></select>
       <button class="primary" id="btn-add-worker">Adicionar</button>
+      <button class="secondary" id="btn-cancelar-edicao-worker" style="display:none;">Cancelar edição</button>
     </div>
     <div class="card">
       <h2><span class="num">4</span> Equipe cadastrada</h2>
@@ -525,6 +548,21 @@
     <div class="card">
       <h2><span class="num">3</span> Histórico de quinzenas pagas</h2>
       <div id="lista-historico"><div class="empty">Nenhuma quinzena marcada como paga ainda.</div></div>
+    </div>
+    <div class="card">
+      <h2><span class="num">4</span> Buscar por colaborador</h2>
+      <label for="rc-colaborador">Colaborador</label>
+      <select id="rc-colaborador"><option value="">— selecione —</option></select>
+      <div id="rc-resultado" style="display:none;">
+        <div id="rc-obras" class="badge-shared" style="display:block; margin-top:10px;"></div>
+        <div class="total-box" style="margin-top:10px;">
+          <div class="lbl">Total de diárias</div>
+          <div class="amt" id="rc-total-diarias">0</div>
+        </div>
+        <div style="margin-top:12px;" id="rc-lista-apontamentos"></div>
+        <button class="primary" id="btn-baixar-pdf-colaborador">Baixar PDF deste colaborador</button>
+      </div>
+      <div id="rc-vazio" class="empty">Selecione o colaborador e o período acima para ver o resumo dele.</div>
     </div>
   </section>
 
@@ -710,7 +748,7 @@
       document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
       btn.classList.add('active');
       $('view-'+btn.dataset.view).classList.add('active');
-      if(btn.dataset.view === 'resumo') renderResumo();
+      if(btn.dataset.view === 'resumo'){ renderResumo(); renderResumoColaborador(); }
       if(btn.dataset.view === 'ajustes') renderAjustes();
     });
   });
@@ -726,24 +764,66 @@
 
   // ---------- RENDER: SELECT DE FUNCIONÁRIOS ----------
   function renderFuncionarioSelect(){
-    const sel = $('f-funcionario');
-    sel.innerHTML = '';
+    const dl = $('lista-colaboradores-datalist');
+    dl.innerHTML = '';
     if(funcionarios.length === 0){
       $('sem-funcionario').style.display = 'block';
-      sel.innerHTML = '<option value="">— cadastre um funcionário —</option>';
+    } else {
+      $('sem-funcionario').style.display = 'none';
+      funcionarios
+        .slice()
+        .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
+        .forEach(f=>{
+          const opt = document.createElement('option');
+          opt.value = f.nome;
+          dl.appendChild(opt);
+        });
+    }
+    renderSelectColaboradorResumo();
+  }
+
+  function funcionarioPorNome(nome){
+    const alvo = (nome || '').trim().toLowerCase();
+    if(!alvo) return null;
+    return funcionarios.find(f => f.nome.trim().toLowerCase() === alvo) || null;
+  }
+
+  function ultimoLancamentoDe(funcionarioId){
+    const doColaborador = lancamentos.filter(l => l.funcionarioId === funcionarioId);
+    if(doColaborador.length === 0) return null;
+    return doColaborador.slice().sort((a,b)=> b.data.localeCompare(a.data))[0];
+  }
+
+  function atualizarCampoColaborador(){
+    const nome = $('f-funcionario-input').value;
+    const f = funcionarioPorNome(nome);
+    const novoBox = $('novo-colaborador-box');
+    const ultimoBox = $('ultimo-lancamento-box');
+
+    if(!nome.trim()){
+      novoBox.style.display = 'none';
+      ultimoBox.style.display = 'none';
       return;
     }
-    $('sem-funcionario').style.display = 'none';
-    funcionarios
-      .slice()
-      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
-      .forEach(f=>{
-        const opt = document.createElement('option');
-        opt.value = f.id;
-        opt.textContent = f.nome;
-        sel.appendChild(opt);
-      });
+
+    if(f){
+      novoBox.style.display = 'none';
+      const ultimo = ultimoLancamentoDe(f.id);
+      if(ultimo){
+        $('f-obra').value = ultimo.obraId || '';
+        ultimoBox.style.display = 'inline-flex';
+        ultimoBox.innerHTML = `Último lançamento: ${fmtDateBR(ultimo.data)} · ${fmtDiarias(ultimo.diarias)} diária(s)${ultimo.obraId ? ' · ' + escapeHtml(nomeObra(ultimo.obraId)) : ''}`;
+      } else {
+        if(f.obraId) $('f-obra').value = f.obraId;
+        ultimoBox.style.display = 'none';
+      }
+    } else {
+      novoBox.style.display = 'block';
+      ultimoBox.style.display = 'none';
+    }
   }
+  $('f-funcionario-input').addEventListener('input', atualizarCampoColaborador);
+  $('f-funcionario-input').addEventListener('change', atualizarCampoColaborador);
 
   // ---------- OBRAS ----------
   function nomeObra(id){
@@ -814,6 +894,8 @@
   });
 
   // ---------- RENDER: LISTA DE EQUIPE ----------
+  let editandoFuncionarioId = null;
+
   function renderEquipe(){
     const box = $('lista-equipe');
     if(funcionarios.length === 0){
@@ -828,15 +910,34 @@
         const row = document.createElement('div');
         row.className = 'worker-row';
         const obraLabel = f.obraId ? nomeObra(f.obraId) : '';
+        const funcaoLabel = f.funcao ? escapeHtml(f.funcao) + ' · ' : '';
         row.innerHTML = `
           <div>
             <div class="name">${escapeHtml(f.nome)}</div>
-            <div class="rate">${fmtBRL(f.valor)} / diária${obraLabel ? ' · ' + escapeHtml(obraLabel) : ''}</div>
+            <div class="rate">${funcaoLabel}${fmtBRL(f.valor)} / diária${obraLabel ? ' · ' + escapeHtml(obraLabel) : ''}</div>
           </div>
-          <button class="del" data-id="${f.id}">✕</button>
+          <div class="acoes">
+            <button class="edit" data-id="${f.id}" title="Editar">✎</button>
+            <button class="del" data-id="${f.id}" title="Excluir">✕</button>
+          </div>
         `;
         box.appendChild(row);
       });
+    box.querySelectorAll('.edit').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const f = funcionarios.find(x=>x.id===btn.dataset.id);
+        if(!f) return;
+        editandoFuncionarioId = f.id;
+        $('w-nome').value = f.nome;
+        $('w-funcao').value = f.funcao || '';
+        $('w-valor').value = f.valor;
+        $('w-obra').value = f.obraId || '';
+        $('w-form-titulo').textContent = 'Editar funcionário';
+        $('btn-add-worker').textContent = 'Salvar alterações';
+        $('btn-cancelar-edicao-worker').style.display = 'block';
+        $('w-nome').scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    });
     box.querySelectorAll('.del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.id;
@@ -849,6 +950,18 @@
     });
   }
 
+  function sairModoEdicaoWorker(){
+    editandoFuncionarioId = null;
+    $('w-nome').value = '';
+    $('w-funcao').value = '';
+    $('w-valor').value = '';
+    $('w-obra').value = '';
+    $('w-form-titulo').textContent = 'Adicionar funcionário';
+    $('btn-add-worker').textContent = 'Adicionar';
+    $('btn-cancelar-edicao-worker').style.display = 'none';
+  }
+  $('btn-cancelar-edicao-worker').addEventListener('click', sairModoEdicaoWorker);
+
   // ---------- RENDER: LANÇAMENTOS RECENTES ----------
   function nomeDe(id){
     const f = funcionarios.find(f=>f.id===id);
@@ -858,6 +971,8 @@
     const f = funcionarios.find(f=>f.id===id);
     return f ? f.valor : 0;
   }
+  let editandoLancamentoId = null;
+
   function renderRecentes(){
     const box = $('lista-recentes');
     if(lancamentos.length === 0){
@@ -878,18 +993,43 @@
               <div class="who">${escapeHtml(nomeDe(l.funcionarioId))}</div>
               <div class="meta">${fmtDateBR(l.data)} · ${fmtDiarias(l.diarias)} diária(s)${l.obraId ? ' · ' + escapeHtml(nomeObra(l.obraId)) : ''}</div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
               <div class="val">${fmtBRL(l.diarias * valorDe(l.funcionarioId))}</div>
-              <button class="del" data-id="${l.id}">✕</button>
+              <div class="acoes">
+                <button class="edit" data-id="${l.id}" title="Editar">✎</button>
+                <button class="del" data-id="${l.id}" title="Excluir">✕</button>
+              </div>
             </div>
           </div>
           ${l.observacao ? `<div class="obs">${escapeHtml(l.observacao)}</div>` : ''}
         `;
         box.appendChild(row);
       });
+    box.querySelectorAll('.edit').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const l = lancamentos.find(x=>x.id===btn.dataset.id);
+        if(!l) return;
+        editandoLancamentoId = l.id;
+        $('f-data').value = l.data;
+        $('f-funcionario-input').value = nomeDe(l.funcionarioId);
+        atualizarCampoColaborador();
+        $('f-obra').value = l.obraId || '';
+        document.querySelectorAll('#f-chips .chip').forEach(c=>{
+          c.classList.toggle('active', parseFloat(c.dataset.v) === l.diarias);
+        });
+        chipValue = l.diarias;
+        $('f-obs').value = l.observacao || '';
+        $('lanc-form-titulo').textContent = 'Editar lançamento';
+        $('btn-salvar').textContent = 'Salvar alterações';
+        $('btn-cancelar-edicao-lancamento').style.display = 'block';
+        document.querySelector('.tab-btn[data-view="lancar"]').click();
+        $('f-data').scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
     box.querySelectorAll('.del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.id;
+        if(!(await showConfirm('Excluir este lançamento? Essa ação não pode ser desfeita.'))) return;
         lancamentos = lancamentos.filter(l=>l.id !== id);
         await saveLancamentos();
         renderRecentes();
@@ -897,6 +1037,23 @@
       });
     });
   }
+
+  function sairModoEdicaoLancamento(){
+    editandoLancamentoId = null;
+    $('f-funcionario-input').value = '';
+    $('f-nova-funcao').value = '';
+    $('f-novo-valor').value = '';
+    document.querySelectorAll('#f-chips .chip').forEach(c=>c.classList.remove('active'));
+    chipValue = null;
+    $('f-obs').value = '';
+    $('f-obra').value = '';
+    $('f-data').value = todayISO();
+    $('lanc-form-titulo').textContent = 'Novo lançamento';
+    $('btn-salvar').textContent = 'Registrar';
+    $('btn-cancelar-edicao-lancamento').style.display = 'none';
+    atualizarCampoColaborador();
+  }
+  $('btn-cancelar-edicao-lancamento').addEventListener('click', sairModoEdicaoLancamento);
 
   function escapeHtml(s){
     const d = document.createElement('div');
@@ -907,31 +1064,70 @@
   // ---------- SALVAR LANÇAMENTO ----------
   $('btn-salvar').addEventListener('click', async ()=>{
     const data = $('f-data').value;
-    const funcionarioId = $('f-funcionario').value;
+    const nomeColaborador = $('f-funcionario-input').value.trim();
     const obraId = $('f-obra').value || null;
     const observacao = $('f-obs').value.trim();
     if(!data){ await showAlert('Escolha a data.'); return; }
-    if(!funcionarioId){ await showAlert('Cadastre e escolha um funcionário.'); return; }
+    if(!nomeColaborador){ await showAlert('Digite ou selecione o colaborador.'); return; }
     if(chipValue === null){ await showAlert('Escolha se foi meia diária, diária inteira ou uma e meia.'); return; }
+
+    let funcionarioId;
+    let funcionarioCriado = null;
+    const existente = funcionarioPorNome(nomeColaborador);
+
+    if(existente){
+      funcionarioId = existente.id;
+    } else {
+      const valorNovo = parseFloat($('f-novo-valor').value);
+      if(isNaN(valorNovo) || valorNovo <= 0){
+        await showAlert('Esse é um colaborador novo — informe o valor da diária dele antes de registrar.');
+        return;
+      }
+      funcionarioCriado = { id: uid(), nome: nomeColaborador, funcao: $('f-nova-funcao').value.trim(), valor: valorNovo, obraId: obraId };
+      funcionarios.push(funcionarioCriado);
+      const okF = await saveFuncionarios();
+      if(!okF){ funcionarios = funcionarios.filter(f=>f.id !== funcionarioCriado.id); return; }
+      funcionarioId = funcionarioCriado.id;
+    }
+
+    if(editandoLancamentoId){
+      const l = lancamentos.find(x=>x.id===editandoLancamentoId);
+      if(!l){ sairModoEdicaoLancamento(); return; }
+      const anterior = { ...l };
+      l.data = data; l.funcionarioId = funcionarioId; l.diarias = chipValue; l.obraId = obraId; l.observacao = observacao;
+      const ok = await saveLancamentos();
+      if(!ok){ Object.assign(l, anterior); return; }
+      sairModoEdicaoLancamento();
+      if(funcionarioCriado){ renderFuncionarioSelect(); renderEquipe(); }
+      renderRecentes();
+      renderResumo();
+      showStamp();
+      return;
+    }
 
     const novo = { id: uid(), data, funcionarioId, diarias: chipValue, obraId, observacao };
     lancamentos.push(novo);
     const ok = await saveLancamentos();
-    if(!ok){ lancamentos = lancamentos.filter(l=>l.id !== novo.id); return; }
+    if(!ok){
+      lancamentos = lancamentos.filter(l=>l.id !== novo.id);
+      if(funcionarioCriado){ funcionarios = funcionarios.filter(f=>f.id !== funcionarioCriado.id); await saveFuncionarios(); }
+      return;
+    }
 
-    // reset parcial (mantém funcionário, obra e data para lançar vários seguidos)
+    // reset parcial (mantém colaborador, obra e data para lançar vários seguidos)
     document.querySelectorAll('#f-chips .chip').forEach(c=>c.classList.remove('active'));
     chipValue = null;
     $('f-obs').value = '';
+    if(funcionarioCriado){
+      $('f-nova-funcao').value = '';
+      $('f-novo-valor').value = '';
+      renderFuncionarioSelect();
+      renderEquipe();
+    }
+    atualizarCampoColaborador();
 
     renderRecentes();
     showStamp();
-  });
-
-  // ao trocar de funcionário, sugere automaticamente a obra cadastrada dele
-  $('f-funcionario').addEventListener('change', ()=>{
-    const f = funcionarios.find(f=>f.id === $('f-funcionario').value);
-    if(f && f.obraId) $('f-obra').value = f.obraId;
   });
 
   function showStamp(){
@@ -945,15 +1141,31 @@
   // ---------- ADICIONAR FUNCIONÁRIO ----------
   $('btn-add-worker').addEventListener('click', async ()=>{
     const nome = $('w-nome').value.trim();
+    const funcao = $('w-funcao').value.trim();
     const valor = parseFloat($('w-valor').value);
     const obraId = $('w-obra').value || null;
     if(!nome){ await showAlert('Digite o nome do funcionário.'); return; }
     if(isNaN(valor) || valor <= 0){ await showAlert('Digite o valor da diária.'); return; }
-    const novo = { id: uid(), nome, valor, obraId };
+
+    if(editandoFuncionarioId){
+      const f = funcionarios.find(x=>x.id===editandoFuncionarioId);
+      if(!f){ sairModoEdicaoWorker(); return; }
+      const anterior = { ...f };
+      f.nome = nome; f.funcao = funcao; f.valor = valor; f.obraId = obraId;
+      const ok = await saveFuncionarios();
+      if(!ok){ Object.assign(f, anterior); return; }
+      sairModoEdicaoWorker();
+      renderEquipe();
+      renderFuncionarioSelect();
+      return;
+    }
+
+    const novo = { id: uid(), nome, funcao, valor, obraId };
     funcionarios.push(novo);
     const ok = await saveFuncionarios();
     if(!ok){ funcionarios = funcionarios.filter(f=>f.id !== novo.id); return; }
     $('w-nome').value = '';
+    $('w-funcao').value = '';
     $('w-valor').value = '';
     $('w-obra').value = '';
     renderEquipe();
@@ -1089,8 +1301,161 @@
     });
   }
 
-  $('r-inicio').addEventListener('change', renderResumo);
-  $('r-fim').addEventListener('change', renderResumo);
+  $('r-inicio').addEventListener('change', ()=>{ renderResumo(); renderResumoColaborador(); });
+  $('r-fim').addEventListener('change', ()=>{ renderResumo(); renderResumoColaborador(); });
+
+  // ---------- RESUMO POR COLABORADOR ----------
+  function renderSelectColaboradorResumo(){
+    const sel = $('rc-colaborador');
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">— selecione —</option>';
+    funcionarios
+      .slice()
+      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
+      .forEach(f=>{
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = f.nome;
+        sel.appendChild(opt);
+      });
+    if(atual && funcionarios.some(f=>f.id===atual)) sel.value = atual;
+  }
+
+  function calcularResumoColaborador(funcionarioId, inicio, fim){
+    const doColaborador = lancamentos.filter(l =>
+      l.funcionarioId === funcionarioId && l.data >= inicio && l.data <= fim
+    ).sort((a,b)=> a.data.localeCompare(b.data));
+    const obrasSet = [...new Set(doColaborador.map(l=>l.obraId).filter(Boolean))];
+    const totalDiarias = doColaborador.reduce((s,l)=> s + l.diarias, 0);
+    const totalValor = totalDiarias * valorDe(funcionarioId);
+    return { apontamentos: doColaborador, obrasSet, totalDiarias, totalValor };
+  }
+
+  function renderResumoColaborador(){
+    const funcionarioId = $('rc-colaborador').value;
+    const inicio = $('r-inicio').value;
+    const fim = $('r-fim').value;
+
+    if(!funcionarioId || !inicio || !fim){
+      $('rc-resultado').style.display = 'none';
+      $('rc-vazio').style.display = 'block';
+      return;
+    }
+
+    const { apontamentos, obrasSet, totalDiarias, totalValor } = calcularResumoColaborador(funcionarioId, inicio, fim);
+
+    $('rc-vazio').style.display = 'none';
+    $('rc-resultado').style.display = 'block';
+
+    $('rc-obras').innerHTML = obrasSet.length
+      ? `Obras no período: ${obrasSet.map(id=>escapeHtml(nomeObra(id))).join(', ')}`
+      : 'Nenhuma obra registrada nos lançamentos deste período.';
+
+    $('rc-total-diarias').textContent = `${fmtDiarias(totalDiarias)} · ${fmtBRL(totalValor)}`;
+
+    const listaBox = $('rc-lista-apontamentos');
+    if(apontamentos.length === 0){
+      listaBox.innerHTML = '<div class="empty">Nenhum lançamento deste colaborador no período.</div>';
+    } else {
+      listaBox.innerHTML = '';
+      apontamentos.forEach(l=>{
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="top-line">
+            <div>
+              <div class="who">${fmtDateBR(l.data)}</div>
+              <div class="meta">${fmtDiarias(l.diarias)} diária(s)${l.obraId ? ' · ' + escapeHtml(nomeObra(l.obraId)) : ''}</div>
+            </div>
+            <div class="val">${fmtBRL(l.diarias * valorDe(funcionarioId))}</div>
+          </div>
+          ${l.observacao ? `<div class="obs">${escapeHtml(l.observacao)}</div>` : ''}
+        `;
+        listaBox.appendChild(row);
+      });
+    }
+  }
+  $('rc-colaborador').addEventListener('change', renderResumoColaborador);
+
+  $('btn-baixar-pdf-colaborador').addEventListener('click', ()=>{
+    const funcionarioId = $('rc-colaborador').value;
+    const inicio = $('r-inicio').value;
+    const fim = $('r-fim').value;
+    if(!funcionarioId || !inicio || !fim) return;
+    const nome = nomeDe(funcionarioId);
+    const { apontamentos, obrasSet, totalDiarias, totalValor } = calcularResumoColaborador(funcionarioId, inicio, fim);
+    gerarPDFColaborador(nome, inicio, fim, apontamentos, obrasSet, totalDiarias, totalValor);
+  });
+
+  function gerarPDFColaborador(nomeColaborador, inicio, fim, apontamentos, obrasSet, totalDiarias, totalValor){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    try{ doc.addImage(LOGO_DATA_URL, 'PNG', 15, 14, 42, 12); }catch(e){}
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(15);
+    doc.text('Resumo do Colaborador', 15, 38);
+
+    doc.setFontSize(11);
+    doc.text(String(nomeColaborador), 15, 46);
+
+    doc.setFontSize(10.5);
+    doc.setFont('helvetica','normal');
+    doc.text(`Período: ${fmtDateBR(inicio)} a ${fmtDateBR(fim)}`, 15, 53);
+
+    const obrasTexto = obrasSet.length ? obrasSet.map(id=>nomeObra(id)).join(', ') : 'Nenhuma';
+    const obrasLinhas = doc.splitTextToSize(`Obras no período: ${obrasTexto}`, 180);
+    doc.text(obrasLinhas, 15, 60);
+
+    let y = 60 + obrasLinhas.length * 6 + 6;
+
+    doc.setFont('helvetica','bold');
+    doc.text('Data', 15, y);
+    doc.text('Diárias', 70, y);
+    doc.text('Obra', 105, y);
+    doc.text('Valor', 165, y);
+    y += 3;
+    doc.setLineWidth(0.3);
+    doc.line(15, y, 195, y);
+    y += 7;
+    doc.setFont('helvetica','normal');
+
+    if(apontamentos.length === 0){
+      doc.text('Nenhum lançamento neste período.', 15, y);
+      y += 8;
+    } else {
+      apontamentos.forEach(l=>{
+        if(y > 270){ doc.addPage(); y = 20; }
+        doc.text(fmtDateBR(l.data), 15, y);
+        doc.text(fmtDiarias(l.diarias), 70, y);
+        doc.text(l.obraId ? String(nomeObra(l.obraId)) : '-', 105, y);
+        doc.text(fmtBRL(l.diarias * (totalDiarias ? totalValor/totalDiarias : 0)), 165, y);
+        y += 6;
+        if(l.observacao){
+          doc.setFontSize(8.5);
+          doc.setTextColor(120,120,120);
+          doc.text(`• ${l.observacao}`, 19, y);
+          doc.setFontSize(10.5);
+          doc.setTextColor(0,0,0);
+          y += 5;
+        }
+        y += 2;
+      });
+    }
+
+    y += 3;
+    doc.line(15, y, 195, y);
+    y += 9;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    doc.text('Total de diárias', 15, y);
+    doc.text(fmtDiarias(totalDiarias), 70, y);
+    doc.text('Total a pagar', 130, y);
+    doc.text(fmtBRL(totalValor), 165, y);
+
+    doc.save(`resumo_${nomeColaborador.replace(/\s+/g,'_')}_${inicio}_a_${fim}.pdf`);
+  }
 
   $('btn-marcar-pago').addEventListener('click', async ()=>{
     const inicio = $('r-inicio').value;
