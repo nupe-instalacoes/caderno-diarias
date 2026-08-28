@@ -125,9 +125,10 @@
     box-shadow: 0 0 0 3px rgba(13,13,13,0.12);
   }
 
-  .chips{ display:flex; gap:8px; margin-top:4px; }
+  .chips{ display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; }
   .chip{
     flex:1;
+    min-width:70px;
     padding:14px 6px;
     text-align:center;
     border-radius:9px;
@@ -146,6 +147,14 @@
     border-color:var(--ink);
   }
   .chip.active small{ color:var(--accent); }
+  .chip-falta{ border-color:var(--danger); color:var(--danger); }
+  .chip-falta small{ color:var(--danger); opacity:0.75; }
+  .chip-falta.active{
+    background:var(--danger);
+    border-color:var(--danger);
+    color:#fff;
+  }
+  .chip-falta.active small{ color:#fff; }
 
   button.primary{
     width:100%;
@@ -472,6 +481,7 @@
         <div class="chip" data-v="0.5">Meia<small>0,5</small></div>
         <div class="chip" data-v="1">Inteira<small>1</small></div>
         <div class="chip" data-v="1.5">1 e meia<small>1,5</small></div>
+        <div class="chip chip-falta" data-v="falta">Falta<small>não conta</small></div>
       </div>
 
       <label for="f-obs">Observações (opcional)</label>
@@ -685,6 +695,19 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
   }
 
+  // Retorna o instante (ms) em que o lançamento foi registrado.
+  // Lançamentos novos gravam isso em criadoEm; para os antigos, sem esse campo,
+  // recuperamos aproximadamente pelo prefixo do próprio id (gerado com Date.now()).
+  function getCriadoEm(l){
+    if(typeof l.criadoEm === 'number') return l.criadoEm;
+    try{
+      const prefixo = l.id.slice(0, -5);
+      const ms = parseInt(prefixo, 36);
+      if(!isNaN(ms)) return ms;
+    }catch(e){}
+    return 0;
+  }
+
   // ---------- STORAGE ----------
   async function loadAll(){
     try{
@@ -758,7 +781,7 @@
     chip.addEventListener('click', ()=>{
       document.querySelectorAll('#f-chips .chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
-      chipValue = parseFloat(chip.dataset.v);
+      chipValue = chip.dataset.v === 'falta' ? 'falta' : parseFloat(chip.dataset.v);
     });
   });
 
@@ -982,19 +1005,23 @@
     box.innerHTML = '';
     lancamentos
       .slice()
-      .sort((a,b)=> b.data.localeCompare(a.data) || 0)
+      .sort((a,b)=> getCriadoEm(b) - getCriadoEm(a))
       .slice(0,15)
       .forEach(l=>{
         const row = document.createElement('div');
         row.className = 'entry-row';
+        const metaTexto = l.falta
+          ? `${fmtDateBR(l.data)} · FALTA`
+          : `${fmtDateBR(l.data)} · ${fmtDiarias(l.diarias)} diária(s)${l.obraId ? ' · ' + escapeHtml(nomeObra(l.obraId)) : ''}`;
+        const valTexto = l.falta ? '—' : fmtBRL(l.diarias * valorDe(l.funcionarioId));
         row.innerHTML = `
           <div class="top-line">
             <div>
               <div class="who">${escapeHtml(nomeDe(l.funcionarioId))}</div>
-              <div class="meta">${fmtDateBR(l.data)} · ${fmtDiarias(l.diarias)} diária(s)${l.obraId ? ' · ' + escapeHtml(nomeObra(l.obraId)) : ''}</div>
+              <div class="meta"${l.falta ? ' style="color:var(--danger); font-weight:600;"' : ''}>${metaTexto}</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
-              <div class="val">${fmtBRL(l.diarias * valorDe(l.funcionarioId))}</div>
+              <div class="val">${valTexto}</div>
               <div class="acoes">
                 <button class="edit" data-id="${l.id}" title="Editar">✎</button>
                 <button class="del" data-id="${l.id}" title="Excluir">✕</button>
@@ -1015,9 +1042,10 @@
         atualizarCampoColaborador();
         $('f-obra').value = l.obraId || '';
         document.querySelectorAll('#f-chips .chip').forEach(c=>{
-          c.classList.toggle('active', parseFloat(c.dataset.v) === l.diarias);
+          const ativo = l.falta ? (c.dataset.v === 'falta') : (parseFloat(c.dataset.v) === l.diarias);
+          c.classList.toggle('active', ativo);
         });
-        chipValue = l.diarias;
+        chipValue = l.falta ? 'falta' : l.diarias;
         $('f-obs').value = l.observacao || '';
         $('lanc-form-titulo').textContent = 'Editar lançamento';
         $('btn-salvar').textContent = 'Salvar alterações';
@@ -1069,7 +1097,10 @@
     const observacao = $('f-obs').value.trim();
     if(!data){ await showAlert('Escolha a data.'); return; }
     if(!nomeColaborador){ await showAlert('Digite ou selecione o colaborador.'); return; }
-    if(chipValue === null){ await showAlert('Escolha se foi meia diária, diária inteira ou uma e meia.'); return; }
+    if(chipValue === null){ await showAlert('Escolha se foi meia diária, diária inteira, uma e meia, ou Falta.'); return; }
+
+    const falta = chipValue === 'falta';
+    const diarias = falta ? 0 : chipValue;
 
     let funcionarioId;
     let funcionarioCriado = null;
@@ -1094,7 +1125,7 @@
       const l = lancamentos.find(x=>x.id===editandoLancamentoId);
       if(!l){ sairModoEdicaoLancamento(); return; }
       const anterior = { ...l };
-      l.data = data; l.funcionarioId = funcionarioId; l.diarias = chipValue; l.obraId = obraId; l.observacao = observacao;
+      l.data = data; l.funcionarioId = funcionarioId; l.diarias = diarias; l.falta = falta; l.obraId = obraId; l.observacao = observacao;
       const ok = await saveLancamentos();
       if(!ok){ Object.assign(l, anterior); return; }
       sairModoEdicaoLancamento();
@@ -1105,7 +1136,7 @@
       return;
     }
 
-    const novo = { id: uid(), data, funcionarioId, diarias: chipValue, obraId, observacao };
+    const novo = { id: uid(), data, funcionarioId, diarias, falta, obraId, observacao, criadoEm: Date.now() };
     lancamentos.push(novo);
     const ok = await saveLancamentos();
     if(!ok){
@@ -1361,13 +1392,16 @@
       apontamentos.forEach(l=>{
         const row = document.createElement('div');
         row.className = 'entry-row';
+        const metaTexto = l.falta
+          ? 'FALTA'
+          : `${fmtDiarias(l.diarias)} diária(s)${l.obraId ? ' · ' + escapeHtml(nomeObra(l.obraId)) : ''}`;
         row.innerHTML = `
           <div class="top-line">
             <div>
               <div class="who">${fmtDateBR(l.data)}</div>
-              <div class="meta">${fmtDiarias(l.diarias)} diária(s)${l.obraId ? ' · ' + escapeHtml(nomeObra(l.obraId)) : ''}</div>
+              <div class="meta"${l.falta ? ' style="color:var(--danger); font-weight:600;"' : ''}>${metaTexto}</div>
             </div>
-            <div class="val">${fmtBRL(l.diarias * valorDe(funcionarioId))}</div>
+            <div class="val">${l.falta ? '—' : fmtBRL(l.diarias * valorDe(funcionarioId))}</div>
           </div>
           ${l.observacao ? `<div class="obs">${escapeHtml(l.observacao)}</div>` : ''}
         `;
@@ -1384,10 +1418,10 @@
     if(!funcionarioId || !inicio || !fim) return;
     const nome = nomeDe(funcionarioId);
     const { apontamentos, obrasSet, totalDiarias, totalValor } = calcularResumoColaborador(funcionarioId, inicio, fim);
-    gerarPDFColaborador(nome, inicio, fim, apontamentos, obrasSet, totalDiarias, totalValor);
+    gerarPDFColaborador(nome, funcionarioId, inicio, fim, apontamentos, obrasSet, totalDiarias, totalValor);
   });
 
-  function gerarPDFColaborador(nomeColaborador, inicio, fim, apontamentos, obrasSet, totalDiarias, totalValor){
+  function gerarPDFColaborador(nomeColaborador, funcionarioId, inicio, fim, apontamentos, obrasSet, totalDiarias, totalValor){
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
@@ -1428,9 +1462,15 @@
       apontamentos.forEach(l=>{
         if(y > 270){ doc.addPage(); y = 20; }
         doc.text(fmtDateBR(l.data), 15, y);
-        doc.text(fmtDiarias(l.diarias), 70, y);
+        if(l.falta){
+          doc.setTextColor(178,59,59);
+          doc.text('FALTA', 70, y);
+          doc.setTextColor(0,0,0);
+        } else {
+          doc.text(fmtDiarias(l.diarias), 70, y);
+        }
         doc.text(l.obraId ? String(nomeObra(l.obraId)) : '-', 105, y);
-        doc.text(fmtBRL(l.diarias * (totalDiarias ? totalValor/totalDiarias : 0)), 165, y);
+        doc.text(l.falta ? '—' : fmtBRL(l.diarias * valorDe(funcionarioId)), 165, y);
         y += 6;
         if(l.observacao){
           doc.setFontSize(8.5);
