@@ -532,7 +532,7 @@
   <!-- VIEW: RESUMO -->
   <section id="view-resumo" class="view">
     <div class="card">
-      <h2><span class="num">1</span> Período da quinzena</h2>
+      <h2><span class="num">1</span> Período em aberto</h2>
       <div class="period-row">
         <div>
           <label for="r-inicio">Início</label>
@@ -543,6 +543,7 @@
           <input type="date" id="r-fim">
         </div>
       </div>
+      <div class="note" style="margin-top:8px;">O início já vem preenchido sozinho: começa no dia seguinte ao último pagamento marcado. Pode ajustar se precisar ver outro período.</div>
     </div>
     <div class="card">
       <h2><span class="num">2</span> Total por funcionário</h2>
@@ -678,6 +679,29 @@
     const off = d.getTimezoneOffset();
     const local = new Date(d.getTime() - off*60000);
     return local.toISOString().slice(0,10);
+  }
+
+  function addDiasISO(dataISO, dias){
+    const [y,m,d] = dataISO.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    dt.setDate(dt.getDate() + dias);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth()+1).padStart(2,'0');
+    const dd = String(dt.getDate()).padStart(2,'0');
+    return `${yy}-${mm}-${dd}`;
+  }
+
+  // Início do período "em aberto": dia seguinte ao fim do último pagamento já registrado.
+  // Sem pagamentos ainda: usa a data do lançamento mais antigo (ou hoje, se não houver nenhum).
+  function calcularInicioPeriodoAberto(){
+    if(pagamentos.length > 0){
+      const ultimoFim = pagamentos.reduce((maisRecente, p) => p.fim > maisRecente ? p.fim : maisRecente, pagamentos[0].fim);
+      return addDiasISO(ultimoFim, 1);
+    }
+    if(lancamentos.length > 0){
+      return lancamentos.reduce((maisAntigo, l) => l.data < maisAntigo ? l.data : maisAntigo, lancamentos[0].data);
+    }
+    return todayISO();
   }
 
   function fmtBRL(n){
@@ -1514,7 +1538,13 @@
     pagamentos = pagamentos.filter(p=>p.id !== registro.id);
     pagamentos.push(registro);
     await savePagamentos();
+
+    // Abre automaticamente o próximo período, começando no dia seguinte a este pagamento
+    $('r-inicio').value = calcularInicioPeriodoAberto();
+    $('r-fim').value = todayISO();
+
     renderResumo();
+    renderResumoColaborador();
   });
 
   $('btn-baixar-pdf').addEventListener('click', ()=>{
@@ -1606,12 +1636,10 @@
   // ---------- INIT ----------
   async function init(){
     $('f-data').value = todayISO();
-    const hoje = new Date();
-    const quinzeAtras = new Date(hoje.getTime() - 15*86400000);
-    $('r-inicio').value = quinzeAtras.toISOString().slice(0,10);
     $('r-fim').value = todayISO();
 
     await loadAll();
+    $('r-inicio').value = calcularInicioPeriodoAberto();
     renderObras();
     renderFuncionarioSelect();
     renderEquipe();
