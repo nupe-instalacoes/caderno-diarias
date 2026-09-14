@@ -1558,12 +1558,19 @@
       l.obraId === obraId && l.data >= inicio && l.data <= fim
     );
     const porFuncionario = {};
+    const datasPorFuncionario = {};
     daObra.forEach(l=>{
       if(!porFuncionario[l.funcionarioId]) porFuncionario[l.funcionarioId] = 0;
       porFuncionario[l.funcionarioId] += l.diarias;
+      if(!datasPorFuncionario[l.funcionarioId]) datasPorFuncionario[l.funcionarioId] = [];
+      datasPorFuncionario[l.funcionarioId].push({ data: l.data, diarias: l.diarias, falta: !!l.falta });
     });
+    Object.values(datasPorFuncionario).forEach(lista => lista.sort((a,b)=> a.data.localeCompare(b.data)));
     const itens = Object.keys(porFuncionario)
-      .map(id => ({ id, nome: nomeDe(id), diarias: porFuncionario[id], valor: porFuncionario[id] * valorDe(id) }))
+      .map(id => ({
+        id, nome: nomeDe(id), diarias: porFuncionario[id], valor: porFuncionario[id] * valorDe(id),
+        datas: datasPorFuncionario[id] || []
+      }))
       .sort((a,b)=> a.nome.localeCompare(b.nome,'pt-BR'));
     const totalDiarias = itens.reduce((s,i)=> s + i.diarias, 0);
     const totalValor = itens.reduce((s,i)=> s + i.valor, 0);
@@ -1654,10 +1661,24 @@
     } else {
       itens.forEach(it=>{
         if(y > 270){ doc.addPage(); y = 20; }
+        doc.setFont('helvetica','bold');
         doc.text(String(it.nome), 15, y);
+        doc.setFont('helvetica','normal');
         doc.text(fmtDiarias(it.diarias), 130, y);
         doc.text(fmtBRL(it.valor), 165, y);
-        y += 7;
+        y += 6;
+
+        doc.setFontSize(8.5);
+        doc.setTextColor(100,100,100);
+        (it.datas || []).forEach(d=>{
+          if(y > 275){ doc.addPage(); y = 20; }
+          const linha = d.falta ? `${fmtDateBR(d.data)} — FALTA` : `${fmtDateBR(d.data)} — ${fmtDiarias(d.diarias)} diária(s)`;
+          doc.text(linha, 19, y);
+          y += 4.5;
+        });
+        doc.setFontSize(10.5);
+        doc.setTextColor(0,0,0);
+        y += 3;
       });
     }
 
