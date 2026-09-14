@@ -843,10 +843,10 @@
     renderSelectColaboradorResumo();
   }
 
-  function funcionarioPorNome(nome){
+  function funcionarioPorNome(nome, ignorarId){
     const alvo = (nome || '').trim().toLowerCase();
     if(!alvo) return null;
-    return funcionarios.find(f => f.nome.trim().toLowerCase() === alvo) || null;
+    return funcionarios.find(f => f.nome.trim().toLowerCase() === alvo && f.id !== ignorarId) || null;
   }
 
   function ultimoLancamentoDe(funcionarioId){
@@ -891,6 +891,12 @@
     if(!id) return '';
     const o = obras.find(o=>o.id===id);
     return o ? o.nome : '';
+  }
+
+  function obraPorNome(nome, ignorarId){
+    const alvo = (nome || '').trim().toLowerCase();
+    if(!alvo) return null;
+    return obras.find(o => o.nome.trim().toLowerCase() === alvo && o.id !== ignorarId) || null;
   }
 
   function popularSelectsObra(){
@@ -947,6 +953,11 @@
   $('btn-add-obra').addEventListener('click', async ()=>{
     const nome = $('o-nome').value.trim();
     if(!nome){ await showAlert('Digite o nome da obra.'); return; }
+    const duplicada = obraPorNome(nome);
+    if(duplicada){
+      const seguir = await showConfirm(`Já existe uma obra chamada "${duplicada.nome}". Deseja cadastrar mesmo assim?`);
+      if(!seguir) return;
+    }
     const nova = { id: uid(), nome };
     obras.push(nova);
     const ok = await saveObras();
@@ -1231,6 +1242,11 @@
     if(editandoFuncionarioId){
       const f = funcionarios.find(x=>x.id===editandoFuncionarioId);
       if(!f){ sairModoEdicaoWorker(); return; }
+      const duplicado = funcionarioPorNome(nome, editandoFuncionarioId);
+      if(duplicado){
+        const seguir = await showConfirm(`Já existe um funcionário chamado "${duplicado.nome}". Deseja salvar mesmo assim?`);
+        if(!seguir) return;
+      }
       const anterior = { ...f };
       f.nome = nome; f.funcao = funcao; f.valor = valor; f.obraId = obraId;
       const ok = await saveFuncionarios();
@@ -1239,6 +1255,12 @@
       renderEquipe();
       renderFuncionarioSelect();
       return;
+    }
+
+    const duplicado = funcionarioPorNome(nome);
+    if(duplicado){
+      const seguir = await showConfirm(`Já existe um funcionário chamado "${duplicado.nome}". Deseja cadastrar mesmo assim?`);
+      if(!seguir) return;
     }
 
     const novo = { id: uid(), nome, funcao, valor, obraId };
