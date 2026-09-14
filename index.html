@@ -575,6 +575,20 @@
       </div>
       <div id="rc-vazio" class="empty">Selecione o colaborador e o período acima para ver o resumo dele.</div>
     </div>
+    <div class="card">
+      <h2><span class="num">5</span> Buscar por obra</h2>
+      <label for="ro-obra">Obra</label>
+      <select id="ro-obra"><option value="">— selecione —</option></select>
+      <div id="ro-resultado" style="display:none;">
+        <div style="margin-top:10px;" id="ro-lista-colaboradores"></div>
+        <div class="total-box" style="margin-top:10px;">
+          <div class="lbl">Custo total de mão de obra</div>
+          <div class="amt" id="ro-total-valor">R$ 0,00</div>
+        </div>
+        <button class="primary" id="btn-baixar-pdf-obra">Baixar PDF desta obra</button>
+      </div>
+      <div id="ro-vazio" class="empty">Selecione a obra e o período acima para ver o custo dela.</div>
+    </div>
   </section>
 
   <!-- VIEW: AJUSTES -->
@@ -795,7 +809,7 @@
       document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
       btn.classList.add('active');
       $('view-'+btn.dataset.view).classList.add('active');
-      if(btn.dataset.view === 'resumo'){ renderResumo(); renderResumoColaborador(); }
+      if(btn.dataset.view === 'resumo'){ renderResumo(); renderResumoColaborador(); renderResumoObra(); }
       if(btn.dataset.view === 'ajustes') renderAjustes();
     });
   });
@@ -899,6 +913,7 @@
 
   function renderObras(){
     popularSelectsObra();
+    renderSelectObraResumo();
     const box = $('lista-obras');
     if(obras.length === 0){
       box.innerHTML = '<div class="empty">Nenhuma obra cadastrada.</div>';
@@ -1356,8 +1371,8 @@
     });
   }
 
-  $('r-inicio').addEventListener('change', ()=>{ renderResumo(); renderResumoColaborador(); });
-  $('r-fim').addEventListener('change', ()=>{ renderResumo(); renderResumoColaborador(); });
+  $('r-inicio').addEventListener('change', ()=>{ renderResumo(); renderResumoColaborador(); renderResumoObra(); });
+  $('r-fim').addEventListener('change', ()=>{ renderResumo(); renderResumoColaborador(); renderResumoObra(); });
 
   // ---------- RESUMO POR COLABORADOR ----------
   function renderSelectColaboradorResumo(){
@@ -1521,6 +1536,145 @@
     doc.save(`resumo_${nomeColaborador.replace(/\s+/g,'_')}_${inicio}_a_${fim}.pdf`);
   }
 
+  // ---------- RESUMO POR OBRA ----------
+  function renderSelectObraResumo(){
+    const sel = $('ro-obra');
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">— selecione —</option>';
+    obras
+      .slice()
+      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
+      .forEach(o=>{
+        const opt = document.createElement('option');
+        opt.value = o.id;
+        opt.textContent = o.nome;
+        sel.appendChild(opt);
+      });
+    if(atual && obras.some(o=>o.id===atual)) sel.value = atual;
+  }
+
+  function calcularResumoObra(obraId, inicio, fim){
+    const daObra = lancamentos.filter(l =>
+      l.obraId === obraId && l.data >= inicio && l.data <= fim
+    );
+    const porFuncionario = {};
+    daObra.forEach(l=>{
+      if(!porFuncionario[l.funcionarioId]) porFuncionario[l.funcionarioId] = 0;
+      porFuncionario[l.funcionarioId] += l.diarias;
+    });
+    const itens = Object.keys(porFuncionario)
+      .map(id => ({ id, nome: nomeDe(id), diarias: porFuncionario[id], valor: porFuncionario[id] * valorDe(id) }))
+      .sort((a,b)=> a.nome.localeCompare(b.nome,'pt-BR'));
+    const totalDiarias = itens.reduce((s,i)=> s + i.diarias, 0);
+    const totalValor = itens.reduce((s,i)=> s + i.valor, 0);
+    return { itens, totalDiarias, totalValor };
+  }
+
+  function renderResumoObra(){
+    const obraId = $('ro-obra').value;
+    const inicio = $('r-inicio').value;
+    const fim = $('r-fim').value;
+
+    if(!obraId || !inicio || !fim){
+      $('ro-resultado').style.display = 'none';
+      $('ro-vazio').style.display = 'block';
+      return;
+    }
+
+    const { itens, totalValor } = calcularResumoObra(obraId, inicio, fim);
+
+    $('ro-vazio').style.display = 'none';
+    $('ro-resultado').style.display = 'block';
+    $('ro-total-valor').textContent = fmtBRL(totalValor);
+
+    const box = $('ro-lista-colaboradores');
+    if(itens.length === 0){
+      box.innerHTML = '<div class="empty">Nenhum lançamento nesta obra, no período.</div>';
+    } else {
+      box.innerHTML = '';
+      itens.forEach(it=>{
+        const row = document.createElement('div');
+        row.className = 'summary-row';
+        row.innerHTML = `
+          <div class="top-line">
+            <div>
+              <div class="name">${escapeHtml(it.nome)}</div>
+              <div class="sub">${fmtDiarias(it.diarias)} diária(s)</div>
+            </div>
+            <div class="amt">${fmtBRL(it.valor)}</div>
+          </div>
+        `;
+        box.appendChild(row);
+      });
+    }
+  }
+  $('ro-obra').addEventListener('change', renderResumoObra);
+
+  $('btn-baixar-pdf-obra').addEventListener('click', ()=>{
+    const obraId = $('ro-obra').value;
+    const inicio = $('r-inicio').value;
+    const fim = $('r-fim').value;
+    if(!obraId || !inicio || !fim) return;
+    const nomeDaObra = nomeObra(obraId);
+    const { itens, totalDiarias, totalValor } = calcularResumoObra(obraId, inicio, fim);
+    gerarPDFObra(nomeDaObra, inicio, fim, itens, totalDiarias, totalValor);
+  });
+
+  function gerarPDFObra(nomeDaObra, inicio, fim, itens, totalDiarias, totalValor){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    try{ doc.addImage(LOGO_DATA_URL, 'PNG', 15, 14, 42, 12); }catch(e){}
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(15);
+    doc.text('Custo de Mão de Obra por Obra', 15, 38);
+
+    doc.setFontSize(11);
+    doc.text(String(nomeDaObra), 15, 46);
+
+    doc.setFontSize(10.5);
+    doc.setFont('helvetica','normal');
+    doc.text(`Período: ${fmtDateBR(inicio)} a ${fmtDateBR(fim)}`, 15, 53);
+
+    let y = 63;
+    doc.setFont('helvetica','bold');
+    doc.text('Colaborador', 15, y);
+    doc.text('Diárias', 130, y);
+    doc.text('Valor', 165, y);
+    y += 3;
+    doc.setLineWidth(0.3);
+    doc.line(15, y, 195, y);
+    y += 7;
+    doc.setFont('helvetica','normal');
+
+    if(itens.length === 0){
+      doc.text('Nenhum lançamento nesta obra, no período.', 15, y);
+      y += 8;
+    } else {
+      itens.forEach(it=>{
+        if(y > 270){ doc.addPage(); y = 20; }
+        doc.text(String(it.nome), 15, y);
+        doc.text(fmtDiarias(it.diarias), 130, y);
+        doc.text(fmtBRL(it.valor), 165, y);
+        y += 7;
+      });
+    }
+
+    y += 3;
+    doc.line(15, y, 195, y);
+    y += 9;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(12);
+    doc.text('Total de diárias', 15, y);
+    doc.text(fmtDiarias(totalDiarias), 130, y);
+    y += 8;
+    doc.text('Custo total', 15, y);
+    doc.text(fmtBRL(totalValor), 165, y);
+
+    doc.save(`custo_obra_${nomeDaObra.replace(/\s+/g,'_')}_${inicio}_a_${fim}.pdf`);
+  }
+
   $('btn-marcar-pago').addEventListener('click', async ()=>{
     const inicio = $('r-inicio').value;
     const fim = $('r-fim').value;
@@ -1545,6 +1699,7 @@
 
     renderResumo();
     renderResumoColaborador();
+    renderResumoObra();
   });
 
   $('btn-baixar-pdf').addEventListener('click', ()=>{
