@@ -1035,6 +1035,32 @@
   }
   let editandoLancamentoId = null;
 
+  function abrirEdicaoLancamento(l){
+    editandoLancamentoId = l.id;
+    $('f-data').value = l.data;
+    $('f-funcionario-input').value = nomeDe(l.funcionarioId);
+    atualizarCampoColaborador();
+    $('f-obra').value = l.obraId || '';
+    document.querySelectorAll('#f-chips .chip').forEach(c=>{
+      const ativo = l.falta ? (c.dataset.v === 'falta') : (parseFloat(c.dataset.v) === l.diarias);
+      c.classList.toggle('active', ativo);
+    });
+    chipValue = l.falta ? 'falta' : l.diarias;
+    $('f-obs').value = l.observacao || '';
+    $('lanc-form-titulo').textContent = 'Editar lançamento';
+    $('btn-salvar').textContent = 'Salvar alterações';
+    $('btn-cancelar-edicao-lancamento').style.display = 'block';
+    document.querySelector('.tab-btn[data-view="lancar"]').click();
+    $('f-data').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  async function excluirLancamento(id){
+    if(!(await showConfirm('Excluir este lançamento? Essa ação não pode ser desfeita.'))) return false;
+    lancamentos = lancamentos.filter(l=>l.id !== id);
+    await saveLancamentos();
+    return true;
+  }
+
   function renderRecentes(){
     const box = $('lista-recentes');
     if(lancamentos.length === 0){
@@ -1075,32 +1101,17 @@
       btn.addEventListener('click', ()=>{
         const l = lancamentos.find(x=>x.id===btn.dataset.id);
         if(!l) return;
-        editandoLancamentoId = l.id;
-        $('f-data').value = l.data;
-        $('f-funcionario-input').value = nomeDe(l.funcionarioId);
-        atualizarCampoColaborador();
-        $('f-obra').value = l.obraId || '';
-        document.querySelectorAll('#f-chips .chip').forEach(c=>{
-          const ativo = l.falta ? (c.dataset.v === 'falta') : (parseFloat(c.dataset.v) === l.diarias);
-          c.classList.toggle('active', ativo);
-        });
-        chipValue = l.falta ? 'falta' : l.diarias;
-        $('f-obs').value = l.observacao || '';
-        $('lanc-form-titulo').textContent = 'Editar lançamento';
-        $('btn-salvar').textContent = 'Salvar alterações';
-        $('btn-cancelar-edicao-lancamento').style.display = 'block';
-        document.querySelector('.tab-btn[data-view="lancar"]').click();
-        $('f-data').scrollIntoView({behavior:'smooth', block:'start'});
+        abrirEdicaoLancamento(l);
       });
     });
     box.querySelectorAll('.del').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
-        const id = btn.dataset.id;
-        if(!(await showConfirm('Excluir este lançamento? Essa ação não pode ser desfeita.'))) return;
-        lancamentos = lancamentos.filter(l=>l.id !== id);
-        await saveLancamentos();
+        const ok = await excluirLancamento(btn.dataset.id);
+        if(!ok) return;
         renderRecentes();
         renderResumo();
+        renderResumoColaborador();
+        renderResumoObra();
       });
     });
   }
@@ -1440,11 +1451,34 @@
               <div class="who">${fmtDateBR(l.data)}</div>
               <div class="meta"${l.falta ? ' style="color:var(--danger); font-weight:600;"' : ''}>${metaTexto}</div>
             </div>
-            <div class="val">${l.falta ? '—' : fmtBRL(l.diarias * valorDe(funcionarioId))}</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="val">${l.falta ? '—' : fmtBRL(l.diarias * valorDe(funcionarioId))}</div>
+              <div class="acoes">
+                <button class="edit" data-id="${l.id}" title="Editar">✎</button>
+                <button class="del" data-id="${l.id}" title="Excluir">✕</button>
+              </div>
+            </div>
           </div>
           ${l.observacao ? `<div class="obs">${escapeHtml(l.observacao)}</div>` : ''}
         `;
         listaBox.appendChild(row);
+      });
+      listaBox.querySelectorAll('.edit').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const l = lancamentos.find(x=>x.id===btn.dataset.id);
+          if(!l) return;
+          abrirEdicaoLancamento(l);
+        });
+      });
+      listaBox.querySelectorAll('.del').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const ok = await excluirLancamento(btn.dataset.id);
+          if(!ok) return;
+          renderResumoColaborador();
+          renderResumo();
+          renderResumoObra();
+          renderRecentes();
+        });
       });
     }
   }
