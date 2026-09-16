@@ -527,6 +527,11 @@
       <h2><span class="num">4</span> Equipe cadastrada</h2>
       <div id="lista-equipe"><div class="empty">Nenhum funcionário cadastrado.</div></div>
     </div>
+    <div class="card">
+      <h2><span class="num">5</span> Funcionários removidos</h2>
+      <div class="note" style="margin-top:0;">Ficam fora das abas principais, mas o histórico de lançamentos continua disponível em Resumo → Buscar por colaborador, inclusive para baixar em PDF.</div>
+      <div id="lista-funcionarios-removidos"><div class="empty">Nenhum funcionário removido.</div></div>
+    </div>
   </section>
 
   <!-- VIEW: RESUMO -->
@@ -827,11 +832,12 @@
   function renderFuncionarioSelect(){
     const dl = $('lista-colaboradores-datalist');
     dl.innerHTML = '';
-    if(funcionarios.length === 0){
+    const ativos = funcionarios.filter(f => f.ativo !== false);
+    if(ativos.length === 0){
       $('sem-funcionario').style.display = 'block';
     } else {
       $('sem-funcionario').style.display = 'none';
-      funcionarios
+      ativos
         .slice()
         .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
         .forEach(f=>{
@@ -971,52 +977,98 @@
 
   function renderEquipe(){
     const box = $('lista-equipe');
-    if(funcionarios.length === 0){
+    const ativos = funcionarios.filter(f => f.ativo !== false);
+    if(ativos.length === 0){
       box.innerHTML = '<div class="empty">Nenhum funcionário cadastrado.</div>';
+    } else {
+      box.innerHTML = '';
+      ativos
+        .slice()
+        .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
+        .forEach(f=>{
+          const row = document.createElement('div');
+          row.className = 'worker-row';
+          const obraLabel = f.obraId ? nomeObra(f.obraId) : '';
+          const funcaoLabel = f.funcao ? escapeHtml(f.funcao) + ' · ' : '';
+          row.innerHTML = `
+            <div>
+              <div class="name">${escapeHtml(f.nome)}</div>
+              <div class="rate">${funcaoLabel}${fmtBRL(f.valor)} / diária${obraLabel ? ' · ' + escapeHtml(obraLabel) : ''}</div>
+            </div>
+            <div class="acoes">
+              <button class="edit" data-id="${f.id}" title="Editar">✎</button>
+              <button class="del" data-id="${f.id}" title="Remover">✕</button>
+            </div>
+          `;
+          box.appendChild(row);
+        });
+      box.querySelectorAll('.edit').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const f = funcionarios.find(x=>x.id===btn.dataset.id);
+          if(!f) return;
+          editandoFuncionarioId = f.id;
+          $('w-nome').value = f.nome;
+          $('w-funcao').value = f.funcao || '';
+          $('w-valor').value = f.valor;
+          $('w-obra').value = f.obraId || '';
+          $('w-form-titulo').textContent = 'Editar funcionário';
+          $('btn-add-worker').textContent = 'Salvar alterações';
+          $('btn-cancelar-edicao-worker').style.display = 'block';
+          $('w-nome').scrollIntoView({behavior:'smooth', block:'center'});
+        });
+      });
+      box.querySelectorAll('.del').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const id = btn.dataset.id;
+          const f = funcionarios.find(x=>x.id===id);
+          if(!f) return;
+          if(!(await showConfirm(`Remover "${f.nome}" das abas principais? O histórico de lançamentos continua disponível em Resumo → Buscar por colaborador, e você pode reativar depois.`))) return;
+          const anterior = f.ativo;
+          f.ativo = false;
+          const ok = await saveFuncionarios();
+          if(!ok){ f.ativo = anterior; return; }
+          renderEquipe();
+          renderFuncionarioSelect();
+        });
+      });
+    }
+    renderFuncionariosRemovidos();
+  }
+
+  function renderFuncionariosRemovidos(){
+    const box = $('lista-funcionarios-removidos');
+    const removidos = funcionarios.filter(f => f.ativo === false);
+    if(removidos.length === 0){
+      box.innerHTML = '<div class="empty">Nenhum funcionário removido.</div>';
       return;
     }
     box.innerHTML = '';
-    funcionarios
+    removidos
       .slice()
       .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'))
       .forEach(f=>{
         const row = document.createElement('div');
         row.className = 'worker-row';
-        const obraLabel = f.obraId ? nomeObra(f.obraId) : '';
         const funcaoLabel = f.funcao ? escapeHtml(f.funcao) + ' · ' : '';
         row.innerHTML = `
           <div>
             <div class="name">${escapeHtml(f.nome)}</div>
-            <div class="rate">${funcaoLabel}${fmtBRL(f.valor)} / diária${obraLabel ? ' · ' + escapeHtml(obraLabel) : ''}</div>
+            <div class="rate">${funcaoLabel}${fmtBRL(f.valor)} / diária</div>
           </div>
           <div class="acoes">
-            <button class="edit" data-id="${f.id}" title="Editar">✎</button>
-            <button class="del" data-id="${f.id}" title="Excluir">✕</button>
+            <button class="secondary" data-id="${f.id}" style="width:auto; margin:0; padding:8px 14px; font-size:12.5px;">Reativar</button>
           </div>
         `;
         box.appendChild(row);
       });
-    box.querySelectorAll('.edit').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    box.querySelectorAll('button[data-id]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
         const f = funcionarios.find(x=>x.id===btn.dataset.id);
         if(!f) return;
-        editandoFuncionarioId = f.id;
-        $('w-nome').value = f.nome;
-        $('w-funcao').value = f.funcao || '';
-        $('w-valor').value = f.valor;
-        $('w-obra').value = f.obraId || '';
-        $('w-form-titulo').textContent = 'Editar funcionário';
-        $('btn-add-worker').textContent = 'Salvar alterações';
-        $('btn-cancelar-edicao-worker').style.display = 'block';
-        $('w-nome').scrollIntoView({behavior:'smooth', block:'center'});
-      });
-    });
-    box.querySelectorAll('.del').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const id = btn.dataset.id;
-        if(!(await showConfirm('Remover este funcionário? Os lançamentos já feitos continuam salvos.'))) return;
-        funcionarios = funcionarios.filter(f=>f.id !== id);
-        await saveFuncionarios();
+        const anterior = f.ativo;
+        f.ativo = true;
+        const ok = await saveFuncionarios();
+        if(!ok){ f.ativo = anterior; return; }
         renderEquipe();
         renderFuncionarioSelect();
       });
@@ -1418,7 +1470,7 @@
       .forEach(f=>{
         const opt = document.createElement('option');
         opt.value = f.id;
-        opt.textContent = f.nome;
+        opt.textContent = f.nome + (f.ativo === false ? ' (removido)' : '');
         sel.appendChild(opt);
       });
     if(atual && funcionarios.some(f=>f.id===atual)) sel.value = atual;
