@@ -599,14 +599,14 @@
   <!-- VIEW: AJUSTES -->
   <section id="view-ajustes" class="view">
     <div class="card">
-      <h2><span class="num">1</span> Proteção por senha</h2>
+      <h2><span class="num">1</span> Acesso</h2>
       <div id="ajustes-status" class="note" style="margin-top:0;"></div>
       <div id="ajustes-conteudo"></div>
     </div>
     <div class="card">
       <div class="note" style="margin-top:0;">
-        Este app não tem servidor próprio, então não é possível enviar recuperação por e-mail.
-        A recuperação de senha funciona só pela pergunta de segurança cadastrada aqui — guardem bem a resposta.
+        O acesso é feito com e-mail e senha de cada um. Só as contas autorizadas no Firebase conseguem ver e gravar os dados.
+        Esqueceu a senha? Na tela de entrada, toque em "Esqueci minha senha" para receber um link por e-mail.
       </div>
     </div>
   </section>
@@ -1931,245 +1931,85 @@
     renderResumo();
   }
 
-  // ---------- ACESSO (SENHA) ----------
-  let acesso = null; // {ativo, senha, pergunta, resposta}
-
-  async function loadAcesso(){
-    try{
-      const a = await storageGet('acesso');
-      acesso = a ? JSON.parse(a.value) : null;
-    }catch(e){ acesso = null; }
+  // ---------- LOGIN SEGURO (Firebase Authentication – e-mail e senha) ----------
+  function esperarUsuario(){
+    return new Promise(res=>{ const off = auth.onAuthStateChanged(u=>{ off(); res(u); }); });
   }
-  async function saveAcesso(){
-    try{
-      await storageSet('acesso', JSON.stringify(acesso));
-      return true;
-    }catch(e){
-      await showAlert('Não consegui salvar. Verifique sua internet e tente novamente. Se persistir, pode ser que o app ainda não esteja publicado — abra o "Compartilhar" no topo e publique.');
-      return false;
-    }
+  function msgErroLogin(e){
+    const c = (e && e.code) || '';
+    if(/invalid-credential|wrong-password|user-not-found|invalid-login|invalid-email/.test(c)) return 'E-mail ou senha incorretos.';
+    if(/too-many-requests/.test(c)) return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+    if(/network/.test(c)) return 'Sem conexão com a internet.';
+    if(/user-disabled/.test(c)) return 'Este acesso foi desativado.';
+    return 'Não foi possível entrar (' + (c || (e && e.message) || 'erro') + ').';
   }
+  function telaLoginSeguro(BOX, LOGO_SRC, TITULO, aoEntrar, erroMsg){
+    let lembrado = ''; try{ lembrado = localStorage.getItem('nupe_email') || ''; }catch(e){}
+    BOX.innerHTML = `
+      <div style="display:flex;justify-content:center;margin-bottom:16px"><img src="${LOGO_SRC}" alt="Nupe" style="height:30px"></div>
+      <h3>${TITULO}</h3>
+      <label for="lg-email">E-mail</label>
+      <input type="email" id="lg-email" autocomplete="username" value="${lembrado.replace(/"/g,'')}" placeholder="seu@email.com">
+      <label for="lg-senha">Senha</label>
+      <input type="password" id="lg-senha" autocomplete="current-password" placeholder="Sua senha">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13.5px;font-weight:500;color:#0D0D0D;margin-top:12px;cursor:pointer">
+        <input type="checkbox" id="lg-manter" checked style="width:20px;height:20px;margin:0"> Manter conectado neste aparelho
+      </label>
+      <div id="lg-erro" style="color:#B23B3B;font-size:12.5px;text-align:center;margin:10px 0 0;${erroMsg?'':'display:none'}">${erroMsg||''}</div>
+      <button class="primary" id="lg-entrar">Entrar</button>
+      <button id="lg-esqueci" style="display:block;margin:14px auto 0;background:none;border:none;font-size:12.5px;color:#535759;text-decoration:underline;cursor:pointer">Esqueci minha senha</button>`;
+    const erro = t => { const el = document.getElementById('lg-erro'); el.textContent = t; el.style.display = 'block'; el.style.color = '#B23B3B'; };
+    const entrar = async ()=>{
+      const email = document.getElementById('lg-email').value.trim(), senha = document.getElementById('lg-senha').value;
+      if(!email || !senha){ erro('Preencha e-mail e senha.'); return; }
+      const btn = document.getElementById('lg-entrar'); btn.disabled = true; btn.textContent = 'Entrando…';
+      try{
+        const manter = document.getElementById('lg-manter').checked;
+        await auth.setPersistence(manter ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
+        await auth.signInWithEmailAndPassword(email, senha);
+        try{ localStorage.setItem('nupe_email', email); }catch(e){}
+        aoEntrar();
+      }catch(e){ btn.disabled = false; btn.textContent = 'Entrar'; erro(msgErroLogin(e)); }
+    };
+    document.getElementById('lg-entrar').onclick = entrar;
+    document.getElementById('lg-senha').onkeydown = e=>{ if(e.key==='Enter') entrar(); };
+    document.getElementById('lg-esqueci').onclick = async ()=>{
+      const email = document.getElementById('lg-email').value.trim();
+      if(!email){ erro('Digite seu e-mail acima e toque em "Esqueci minha senha" de novo.'); return; }
+      try{ await auth.sendPasswordResetEmail(email); const el = document.getElementById('lg-erro'); el.style.display='block'; el.style.color='#1F6E4A'; el.textContent = 'Enviamos um link para criar nova senha em ' + email + ' (confira também o spam).'; }
+      catch(e){ erro(msgErroLogin(e)); }
+    };
+  }
+  async function exigirLogin(BOX, LOGO_SRC, TITULO){
+    let u = await esperarUsuario();
+    if(u && u.isAnonymous){ try{ await auth.signOut(); }catch(e){} u = null; }
+    if(u) return u;
+    return new Promise(res=>{ telaLoginSeguro(BOX, LOGO_SRC, TITULO, ()=>res(auth.currentUser)); });
+  }
+  async function sair(){ try{ sessionStorage.clear(); }catch(e){} await auth.signOut(); location.reload(); }
 
   function unlockApp(){
     $('lock-screen').classList.add('hidden');
     init();
   }
-
-  function telaLogin(erroMsg){
-    $('lock-screen').classList.remove('hidden');
-    $('lock-box-content').innerHTML = `
-      <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
-      <h3>Área protegida</h3>
-      <label for="login-senha">Senha</label>
-      <input type="password" id="login-senha" placeholder="Digite a senha">
-      <div class="erro" id="erro-login" style="${erroMsg ? 'display:block;' : ''}">${erroMsg || ''}</div>
-      <button class="primary" id="btn-login">Entrar</button>
-      <button class="link-esqueci" id="btn-esqueci">Esqueci minha senha</button>
-    `;
-    $('btn-login').addEventListener('click', ()=>{
-      const val = $('login-senha').value;
-      if(val === acesso.senha){
-        unlockApp();
-      } else {
-        telaLogin('Senha incorreta. Tente novamente.');
-      }
-    });
-    $('login-senha').addEventListener('keydown', (e)=>{ if(e.key==='Enter') $('btn-login').click(); });
-    $('btn-esqueci').addEventListener('click', ()=> telaRecuperar());
-  }
-
-  function telaRecuperar(erroMsg){
-    $('lock-box-content').innerHTML = `
-      <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
-      <h3>Recuperar acesso</h3>
-      <div class="lock-msg">${escapeHtml(acesso.pergunta)}</div>
-      <label for="rec-resposta">Sua resposta</label>
-      <input type="text" id="rec-resposta" placeholder="Digite a resposta">
-      <div class="erro" id="erro-rec" style="${erroMsg ? 'display:block;' : ''}">${erroMsg || ''}</div>
-      <button class="primary" id="btn-verificar">Verificar</button>
-      <button class="link-esqueci" id="btn-voltar-login">Voltar</button>
-    `;
-    $('btn-verificar').addEventListener('click', ()=>{
-      const val = $('rec-resposta').value.trim().toLowerCase();
-      if(val && val === acesso.resposta){
-        telaNovaSenha(true);
-      } else {
-        telaRecuperar('Resposta incorreta. Tente novamente.');
-      }
-    });
-    $('btn-voltar-login').addEventListener('click', ()=> telaLogin());
-  }
-
-  function telaNovaSenha(viaLockScreen){
-    $('lock-box-content').innerHTML = `
-      <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
-      <h3>Criar nova senha</h3>
-      <label for="nn-senha">Nova senha</label>
-      <input type="password" id="nn-senha" placeholder="Digite a nova senha">
-      <label for="nn-senha2">Confirmar nova senha</label>
-      <input type="password" id="nn-senha2" placeholder="Digite novamente">
-      <div class="erro" id="erro-nn"></div>
-      <button class="primary" id="btn-nova-senha">Salvar nova senha e entrar</button>
-    `;
-    $('btn-nova-senha').addEventListener('click', async ()=>{
-      const s1 = $('nn-senha').value;
-      const s2 = $('nn-senha2').value;
-      const erro = $('erro-nn');
-      if(!s1 || s1.length < 4){ erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; erro.style.display='block'; return; }
-      if(s1 !== s2){ erro.textContent = 'As senhas não são iguais.'; erro.style.display='block'; return; }
-      acesso.senha = s1;
-      await saveAcesso();
-      if(viaLockScreen){ unlockApp(); } else { renderAjustes(); }
-    });
-  }
-
   async function iniciarAcesso(){
-    try{
-      await ensureAuth();
-    }catch(e){
-      $('lock-box-content').innerHTML = `
-        <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
-        <h3>Não consegui conectar</h3>
-        <div class="lock-msg">
-          Este app precisa ser aberto por um endereço de site (http/https), não direto do arquivo baixado no computador.
-          Abra pelo link publicado no Claude, ou pelo endereço do site depois de subir na hospedagem.
-        </div>
-        <div class="lock-msg" style="font-family:monospace; font-size:11px; color:var(--danger); text-align:left; word-break:break-all;">
-          Detalhe técnico: ${escapeHtml(String(e && (e.code || e.message) || e))}
-        </div>
-      `;
-      return;
-    }
-    await loadAcesso();
-    if(acesso && acesso.ativo){
-      telaLogin();
-    } else {
-      $('lock-screen').classList.add('hidden');
-      unlockApp();
-    }
+    $('lock-screen').classList.remove('hidden');
+    await exigirLogin($('lock-box-content'), LOGO_DATA_URL, 'Caderno de Diárias');
+    unlockApp();
   }
 
   // ---------- AJUSTES ----------
   function renderAjustes(){
-    const statusBox = $('ajustes-status');
-    const box = $('ajustes-conteudo');
-    const ativo = !!(acesso && acesso.ativo);
-    const temSenhaConfigurada = !!(acesso && acesso.senha);
-
-    statusBox.innerHTML = `Situação atual: <strong>${ativo ? 'senha ativada' : 'senha desativada'}</strong>`;
-
-    if(ativo){
-      box.innerHTML = `
-        <button class="secondary" id="btn-desativar-senha">Desativar senha</button>
-        <button class="secondary" id="btn-trocar-senha">Alterar senha</button>
-        <button class="secondary" id="btn-trocar-pergunta">Alterar pergunta de segurança</button>
-      `;
-      $('btn-desativar-senha').addEventListener('click', async ()=>{
-        if(!(await showConfirm('Desativar a senha? Qualquer pessoa com o link vai poder abrir o app sem digitar senha.'))) return;
-        acesso.ativo = false;
-        await saveAcesso();
-        renderAjustes();
-      });
-      $('btn-trocar-senha').addEventListener('click', ()=> formTrocarSenha());
-      $('btn-trocar-pergunta').addEventListener('click', ()=> formTrocarPergunta());
-    } else if(temSenhaConfigurada){
-      box.innerHTML = `
-        <div class="note" style="margin-top:0;">Já existe uma senha configurada (${escapeHtml(acesso.pergunta)}). Você pode reativá-la ou criar uma nova.</div>
-        <button class="primary" id="btn-reativar-senha">Reativar senha existente</button>
-        <button class="secondary" id="btn-nova-config">Configurar uma nova senha</button>
-      `;
-      $('btn-reativar-senha').addEventListener('click', async ()=>{
-        acesso.ativo = true;
-        await saveAcesso();
-        renderAjustes();
-      });
-      $('btn-nova-config').addEventListener('click', ()=> formConfigurarSenha());
-    } else {
-      box.innerHTML = `
-        <div class="note" style="margin-top:0;">Nenhuma senha configurada. Ative se quiser proteger o acesso ao app.</div>
-        <button class="primary" id="btn-configurar-senha">Ativar proteção por senha</button>
-      `;
-      $('btn-configurar-senha').addEventListener('click', ()=> formConfigurarSenha());
-    }
-  }
-
-  function formConfigurarSenha(){
-    const box = $('ajustes-conteudo');
-    box.innerHTML = `
-      <label for="cfg-senha">Senha</label>
-      <input type="password" id="cfg-senha" placeholder="Crie uma senha">
-      <label for="cfg-senha2">Confirmar senha</label>
-      <input type="password" id="cfg-senha2" placeholder="Digite a senha novamente">
-      <label for="cfg-pergunta">Pergunta de segurança (para o caso de esquecer)</label>
-      <input type="text" id="cfg-pergunta" placeholder="Ex: nome do nosso primeiro cliente?">
-      <label for="cfg-resposta">Resposta</label>
-      <input type="text" id="cfg-resposta" placeholder="Resposta da pergunta acima">
-      <div class="erro" id="erro-cfg"></div>
-      <button class="primary" id="btn-salvar-cfg">Ativar senha</button>
-      <button class="secondary" id="btn-cancelar-cfg">Cancelar</button>
-    `;
-    $('btn-salvar-cfg').addEventListener('click', async ()=>{
-      const senha = $('cfg-senha').value;
-      const senha2 = $('cfg-senha2').value;
-      const pergunta = $('cfg-pergunta').value.trim();
-      const resposta = $('cfg-resposta').value.trim();
-      const erro = $('erro-cfg');
-      if(!senha || senha.length < 4){ erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; erro.style.display='block'; return; }
-      if(senha !== senha2){ erro.textContent = 'As senhas não são iguais.'; erro.style.display='block'; return; }
-      if(!pergunta || !resposta){ erro.textContent = 'Preencha a pergunta e a resposta de segurança.'; erro.style.display='block'; return; }
-      acesso = { ativo:true, senha, pergunta, resposta: resposta.toLowerCase() };
-      await saveAcesso();
-      renderAjustes();
+    const u = auth.currentUser;
+    $('ajustes-status').innerHTML = `Conectado como: <strong>${escapeHtml(u && u.email ? u.email : '—')}</strong>`;
+    $('ajustes-conteudo').innerHTML = `
+      <button class="secondary" id="btn-trocar-senha-email">Trocar minha senha (recebo um link por e-mail)</button>
+      <button class="secondary" id="btn-sair" style="border-color:var(--danger);color:var(--danger)">Sair deste aparelho</button>`;
+    $('btn-trocar-senha-email').addEventListener('click', async ()=>{
+      try{ await auth.sendPasswordResetEmail(u.email); await showAlert('Enviamos um link para ' + u.email + ' para você criar uma nova senha. Confira também a caixa de spam.'); }
+      catch(e){ await showAlert(msgErroLogin(e)); }
     });
-    $('btn-cancelar-cfg').addEventListener('click', ()=> renderAjustes());
-  }
-
-  function formTrocarSenha(){
-    const box = $('ajustes-conteudo');
-    box.innerHTML = `
-      <label for="ts-senha">Nova senha</label>
-      <input type="password" id="ts-senha" placeholder="Digite a nova senha">
-      <label for="ts-senha2">Confirmar nova senha</label>
-      <input type="password" id="ts-senha2" placeholder="Digite novamente">
-      <div class="erro" id="erro-ts"></div>
-      <button class="primary" id="btn-salvar-ts">Salvar nova senha</button>
-      <button class="secondary" id="btn-cancelar-ts">Cancelar</button>
-    `;
-    $('btn-salvar-ts').addEventListener('click', async ()=>{
-      const s1 = $('ts-senha').value;
-      const s2 = $('ts-senha2').value;
-      const erro = $('erro-ts');
-      if(!s1 || s1.length < 4){ erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; erro.style.display='block'; return; }
-      if(s1 !== s2){ erro.textContent = 'As senhas não são iguais.'; erro.style.display='block'; return; }
-      acesso.senha = s1;
-      await saveAcesso();
-      renderAjustes();
-    });
-    $('btn-cancelar-ts').addEventListener('click', ()=> renderAjustes());
-  }
-
-  function formTrocarPergunta(){
-    const box = $('ajustes-conteudo');
-    box.innerHTML = `
-      <label for="tp-pergunta">Nova pergunta de segurança</label>
-      <input type="text" id="tp-pergunta" value="${escapeHtml(acesso.pergunta || '')}">
-      <label for="tp-resposta">Nova resposta</label>
-      <input type="text" id="tp-resposta" placeholder="Digite a resposta">
-      <div class="erro" id="erro-tp"></div>
-      <button class="primary" id="btn-salvar-tp">Salvar</button>
-      <button class="secondary" id="btn-cancelar-tp">Cancelar</button>
-    `;
-    $('btn-salvar-tp').addEventListener('click', async ()=>{
-      const pergunta = $('tp-pergunta').value.trim();
-      const resposta = $('tp-resposta').value.trim();
-      const erro = $('erro-tp');
-      if(!pergunta || !resposta){ erro.textContent = 'Preencha a pergunta e a resposta.'; erro.style.display='block'; return; }
-      acesso.pergunta = pergunta;
-      acesso.resposta = resposta.toLowerCase();
-      await saveAcesso();
-      renderAjustes();
-    });
-    $('btn-cancelar-tp').addEventListener('click', ()=> renderAjustes());
+    $('btn-sair').addEventListener('click', async ()=>{ if(await showConfirm('Sair deste aparelho? Vai ser preciso digitar e-mail e senha de novo.')) sair(); });
   }
 
   iniciarAcesso();
