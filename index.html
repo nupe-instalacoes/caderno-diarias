@@ -109,7 +109,7 @@
   }
   label:first-of-type{margin-top:0;}
 
-  input[type=date], input[type=text], input[type=number], select{
+  input[type=date], input[type=text], input[type=number], input[type=password], select{
     width:100%;
     padding:12px 12px;
     border-radius:9px;
@@ -2197,7 +2197,8 @@
     try{
       const a = await storageGet('acesso');
       acesso = a ? JSON.parse(a.value) : null;
-    }catch(e){ acesso = null; }
+      return true;
+    }catch(e){ acesso = null; return false; }
   }
   async function saveAcesso(){
     try{
@@ -2299,7 +2300,17 @@
       `;
       return;
     }
-    await loadAcesso();
+    const leituraOk = await loadAcesso();
+    if(!leituraOk){
+      $('lock-box-content').innerHTML = `
+        <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
+        <h3>Não consegui verificar o acesso</h3>
+        <div class="lock-msg">Verifique a internet e tente de novo. Por segurança, o app não abre sem essa verificação.</div>
+        <button class="primary" id="btn-tentar-acesso">Tentar novamente</button>
+      `;
+      $('btn-tentar-acesso').addEventListener('click', ()=> location.reload());
+      return;
+    }
     if(acesso && acesso.ativo){
       telaLogin();
     } else {
