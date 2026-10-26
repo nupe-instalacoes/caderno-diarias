@@ -2193,12 +2193,13 @@
   // ---------- ACESSO (SENHA) ----------
   let acesso = null; // {ativo, senha, pergunta, resposta}
 
+  let erroAcesso = '';
   async function loadAcesso(){
     try{
       const a = await storageGet('acesso');
       acesso = a ? JSON.parse(a.value) : null;
       return true;
-    }catch(e){ acesso = null; return false; }
+    }catch(e){ acesso = null; erroAcesso = String(e && (e.code || e.message) || e); return false; }
   }
   async function saveAcesso(){
     try{
@@ -2306,6 +2307,9 @@
         <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
         <h3>Não consegui verificar o acesso</h3>
         <div class="lock-msg">Verifique a internet e tente de novo. Por segurança, o app não abre sem essa verificação.</div>
+        <div class="lock-msg" style="font-family:monospace; font-size:11px; color:var(--danger); text-align:left; word-break:break-all;">Detalhe técnico: ${escapeHtml(erroAcesso)}</div>
+        <div class="lock-msg">Se o erro for "permission-denied", este aparelho ainda não foi autorizado. Código deste aparelho:</div>
+        <div class="lock-msg" style="font-family:monospace; font-size:12px; text-align:left; word-break:break-all; user-select:all;">${escapeHtml((auth.currentUser && auth.currentUser.uid) || '')}</div>
         <button class="primary" id="btn-tentar-acesso">Tentar novamente</button>
       `;
       $('btn-tentar-acesso').addEventListener('click', ()=> location.reload());
