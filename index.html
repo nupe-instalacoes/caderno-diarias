@@ -231,6 +231,15 @@
   .worker-row .edit{ background:none;border:none;color:var(--ink); font-size:16px;cursor:pointer; padding:4px 6px; }
   .worker-row .del{ background:none;border:none;color:var(--danger);font-size:17px;cursor:pointer; padding:4px 6px; }
 
+  .lista-topo{ display:flex; gap:8px; margin:10px 0 4px; }
+  .lista-topo button{ margin:0; font-size:12.5px; padding:9px 8px; }
+  .sel-row{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line); cursor:pointer; }
+  .sel-row:last-child{ border-bottom:none; }
+  .sel-row input[type=checkbox]{ width:20px; height:20px; flex-shrink:0; accent-color:var(--accent); margin:0; }
+  .sel-row.incompleto{ opacity:.55; cursor:default; }
+  .sel-row .name{ font-weight:600; font-size:14.5px; }
+  .sel-row .rate{ font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--ink-soft); }
+
   .summary-row{
     display:flex; flex-direction:column;
     padding:10px 0; border-bottom:1px dashed var(--line);
@@ -512,14 +521,21 @@
     </div>
     <div class="card">
       <h2><span class="num">3</span> <span id="w-form-titulo">Adicionar funcionário</span></h2>
-      <label for="w-nome">Nome</label>
-      <input type="text" id="w-nome" placeholder="Nome do funcionário">
+      <label for="w-nome">Nome completo</label>
+      <input type="text" id="w-nome" placeholder="Nome completo do colaborador" autocomplete="off">
+      <label for="w-cpf">CPF</label>
+      <input type="text" id="w-cpf" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off">
+      <label for="w-nasc">Data de nascimento</label>
+      <input type="text" id="w-nasc" placeholder="DD/MM/AAAA" inputmode="numeric" maxlength="10" autocomplete="off">
       <label for="w-funcao">Função</label>
       <input type="text" id="w-funcao" placeholder="Ex: Pedreiro, Servente, Eletricista...">
       <label for="w-valor">Valor da diária (R$)</label>
       <input type="number" id="w-valor" placeholder="Ex: 150" min="0" step="0.01">
       <label for="w-obra">Obra atual (opcional)</label>
       <select id="w-obra"><option value="">— nenhuma —</option></select>
+      <label for="w-situacao">Situação</label>
+      <select id="w-situacao"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+      <div class="note">CPF e data de nascimento são opcionais no cadastro, mas necessários para entrar na Lista de Colaboradores.</div>
       <button class="primary" id="btn-add-worker">Adicionar</button>
       <button class="secondary" id="btn-cancelar-edicao-worker" style="display:none;">Cancelar edição</button>
     </div>
@@ -528,9 +544,9 @@
       <div id="lista-equipe"><div class="empty">Nenhum funcionário cadastrado.</div></div>
     </div>
     <div class="card">
-      <h2><span class="num">5</span> Funcionários removidos</h2>
-      <div class="note" style="margin-top:0;">Ficam fora das abas principais, mas o histórico de lançamentos continua disponível em Resumo → Buscar por colaborador, inclusive para baixar em PDF.</div>
-      <div id="lista-funcionarios-removidos"><div class="empty">Nenhum funcionário removido.</div></div>
+      <h2><span class="num">5</span> Funcionários inativos</h2>
+      <div class="note" style="margin-top:0;">Colaboradores inativos ficam fora das abas principais e da Lista de Colaboradores, mas o histórico de lançamentos continua disponível em Resumo → Buscar por colaborador, inclusive para baixar em PDF.</div>
+      <div id="lista-funcionarios-removidos"><div class="empty">Nenhum funcionário inativo.</div></div>
     </div>
   </section>
 
@@ -596,17 +612,49 @@
     </div>
   </section>
 
+  <!-- VIEW: LISTA -->
+  <section id="view-lista" class="view">
+    <div id="lista-bloqueio" class="card" style="display:none;">
+      <h2>Acesso restrito</h2>
+      <div class="note" style="margin-top:0;">A Lista de Colaboradores usa CPF e data de nascimento, que são dados pessoais. Para liberar esta aba, ative a proteção por senha em Ajustes.</div>
+      <button class="primary" id="btn-ir-ajustes">Ir para Ajustes</button>
+    </div>
+    <div id="lista-conteudo">
+      <div class="card">
+        <h2><span class="num">1</span> Dados do documento</h2>
+        <label for="l-obra">Obra / unidade</label>
+        <input type="text" id="l-obra" list="l-obra-opcoes" placeholder="Nome da obra ou unidade" autocomplete="off">
+        <datalist id="l-obra-opcoes"></datalist>
+        <label for="l-cliente">Cliente / condomínio (se necessário)</label>
+        <input type="text" id="l-cliente" placeholder="Opcional" autocomplete="off">
+        <label for="l-emissao">Data de emissão</label>
+        <input type="date" id="l-emissao">
+      </div>
+      <div class="card">
+        <h2><span class="num">2</span> Colaboradores</h2>
+        <input type="text" id="l-busca" placeholder="Buscar por nome" autocomplete="off">
+        <div class="lista-topo">
+          <button class="secondary" id="btn-lista-todos" type="button">Selecionar todos os ativos</button>
+          <button class="secondary" id="btn-lista-nenhum" type="button">Desmarcar todos</button>
+        </div>
+        <div id="lista-colab"></div>
+        <div class="note" id="lista-contador"></div>
+        <button class="primary" id="btn-gerar-lista">Gerar PDF</button>
+      </div>
+    </div>
+  </section>
+
   <!-- VIEW: AJUSTES -->
   <section id="view-ajustes" class="view">
     <div class="card">
-      <h2><span class="num">1</span> Acesso</h2>
+      <h2><span class="num">1</span> Proteção por senha</h2>
       <div id="ajustes-status" class="note" style="margin-top:0;"></div>
       <div id="ajustes-conteudo"></div>
     </div>
     <div class="card">
       <div class="note" style="margin-top:0;">
-        O acesso é feito com e-mail e senha de cada um. Só as contas autorizadas no Firebase conseguem ver e gravar os dados.
-        Esqueceu a senha? Na tela de entrada, toque em "Esqueci minha senha" para receber um link por e-mail.
+        Este app não tem servidor próprio, então não é possível enviar recuperação por e-mail.
+        A recuperação de senha funciona só pela pergunta de segurança cadastrada aqui — guardem bem a resposta.
       </div>
     </div>
   </section>
@@ -619,6 +667,7 @@
   <button class="tab-btn active" data-view="lancar"><span class="ic">✎</span>Lançar</button>
   <button class="tab-btn" data-view="equipe"><span class="ic">👥</span>Equipe</button>
   <button class="tab-btn" data-view="resumo"><span class="ic">Σ</span>Resumo</button>
+  <button class="tab-btn" data-view="lista"><span class="ic">☰</span>Lista</button>
   <button class="tab-btn" data-view="ajustes"><span class="ic">⚙</span>Ajustes</button>
 </nav>
 
@@ -816,6 +865,7 @@
       $('view-'+btn.dataset.view).classList.add('active');
       if(btn.dataset.view === 'resumo'){ renderResumo(); renderResumoColaborador(); renderResumoObra(); }
       if(btn.dataset.view === 'ajustes') renderAjustes();
+      if(btn.dataset.view === 'lista') renderLista();
     });
   });
 
@@ -972,6 +1022,55 @@
     renderObras();
   });
 
+  // ---------- CPF / NASCIMENTO ----------
+  function soDigitos(v){ return String(v||'').replace(/\D/g,''); }
+  function validarCPF(v){
+    const c = soDigitos(v);
+    if(c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+    for(let t=9; t<=10; t++){
+      let soma = 0;
+      for(let i=0; i<t; i++) soma += parseInt(c[i],10) * (t+1-i);
+      const dv = ((soma*10) % 11) % 10;
+      if(dv !== parseInt(c[t],10)) return false;
+    }
+    return true;
+  }
+  function fmtCPF(v){
+    const c = soDigitos(v).slice(0,11);
+    return c.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  }
+  function mascararCPF(v){
+    const c = soDigitos(v);
+    return c.length === 11 ? '***.' + c.slice(3,6) + '.***-**' : '';
+  }
+  function fmtNascInput(v){
+    const d = soDigitos(v).slice(0,8);
+    return d.replace(/^(\d{2})(\d)/,'$1/$2').replace(/^(\d{2})\/(\d{2})(\d)/,'$1/$2/$3');
+  }
+  // 'DD/MM/AAAA' -> 'AAAA-MM-DD' ou null se inválida
+  function nascBRparaISO(txt){
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(txt||'').trim());
+    if(!m) return null;
+    const d = +m[1], mo = +m[2], a = +m[3];
+    const dt = new Date(a, mo-1, d);
+    if(dt.getFullYear() !== a || dt.getMonth() !== mo-1 || dt.getDate() !== d) return null;
+    if(a < 1900) return null;
+    const iso = `${m[3]}-${m[2]}-${m[1]}`;
+    if(iso > todayISO()) return null;
+    return iso;
+  }
+  function nascISOparaBR(iso){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||''));
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+  }
+  function funcionarioPorCPF(cpf, ignorarId){
+    const c = soDigitos(cpf);
+    if(!c) return null;
+    return funcionarios.find(f => f.id !== ignorarId && soDigitos(f.cpf) === c) || null;
+  }
+  $('w-cpf').addEventListener('input', e=>{ e.target.value = fmtCPF(e.target.value); });
+  $('w-nasc').addEventListener('input', e=>{ e.target.value = fmtNascInput(e.target.value); });
+
   // ---------- RENDER: LISTA DE EQUIPE ----------
   let editandoFuncionarioId = null;
 
@@ -994,6 +1093,7 @@
             <div>
               <div class="name">${escapeHtml(f.nome)}</div>
               <div class="rate">${funcaoLabel}${fmtBRL(f.valor)} / diária${obraLabel ? ' · ' + escapeHtml(obraLabel) : ''}</div>
+              ${f.cpf ? `<div class="rate">CPF ${mascararCPF(f.cpf)}</div>` : ''}
             </div>
             <div class="acoes">
               <button class="edit" data-id="${f.id}" title="Editar">✎</button>
@@ -1011,6 +1111,9 @@
           $('w-funcao').value = f.funcao || '';
           $('w-valor').value = f.valor;
           $('w-obra').value = f.obraId || '';
+          $('w-cpf').value = fmtCPF(f.cpf);
+          $('w-nasc').value = nascISOparaBR(f.dataNascimento);
+          $('w-situacao').value = 'ativo';
           $('w-form-titulo').textContent = 'Editar funcionário';
           $('btn-add-worker').textContent = 'Salvar alterações';
           $('btn-cancelar-edicao-worker').style.display = 'block';
@@ -1039,7 +1142,7 @@
     const box = $('lista-funcionarios-removidos');
     const removidos = funcionarios.filter(f => f.ativo === false);
     if(removidos.length === 0){
-      box.innerHTML = '<div class="empty">Nenhum funcionário removido.</div>';
+      box.innerHTML = '<div class="empty">Nenhum funcionário inativo.</div>';
       return;
     }
     box.innerHTML = '';
@@ -1081,6 +1184,9 @@
     $('w-funcao').value = '';
     $('w-valor').value = '';
     $('w-obra').value = '';
+    $('w-cpf').value = '';
+    $('w-nasc').value = '';
+    $('w-situacao').value = 'ativo';
     $('w-form-titulo').textContent = 'Adicionar funcionário';
     $('btn-add-worker').textContent = 'Adicionar';
     $('btn-cancelar-edicao-worker').style.display = 'none';
@@ -1288,8 +1394,19 @@
     const funcao = $('w-funcao').value.trim();
     const valor = parseFloat($('w-valor').value);
     const obraId = $('w-obra').value || null;
-    if(!nome){ await showAlert('Digite o nome do funcionário.'); return; }
+    const cpfDigitos = soDigitos($('w-cpf').value);
+    const nascTxt = $('w-nasc').value.trim();
+    const ativoNovo = $('w-situacao').value !== 'inativo';
+    if(!nome){ await showAlert('Digite o nome completo do colaborador.'); return; }
     if(isNaN(valor) || valor <= 0){ await showAlert('Digite o valor da diária.'); return; }
+    if(cpfDigitos && !validarCPF(cpfDigitos)){ await showAlert('CPF inválido. Confira os números digitados.'); return; }
+    const dupCPF = funcionarioPorCPF(cpfDigitos, editandoFuncionarioId);
+    if(dupCPF){ await showAlert(`Este CPF já está cadastrado para "${dupCPF.nome}".`); return; }
+    let nascISO = '';
+    if(nascTxt){
+      nascISO = nascBRparaISO(nascTxt);
+      if(!nascISO){ await showAlert('Data de nascimento inválida. Use o formato DD/MM/AAAA.'); return; }
+    }
 
     if(editandoFuncionarioId){
       const f = funcionarios.find(x=>x.id===editandoFuncionarioId);
@@ -1301,6 +1418,8 @@
       }
       const anterior = { ...f };
       f.nome = nome; f.funcao = funcao; f.valor = valor; f.obraId = obraId;
+      f.cpf = cpfDigitos; f.dataNascimento = nascISO;
+      if(!ativoNovo) f.ativo = false;
       const ok = await saveFuncionarios();
       if(!ok){ Object.assign(f, anterior); return; }
       sairModoEdicaoWorker();
@@ -1315,7 +1434,7 @@
       if(!seguir) return;
     }
 
-    const novo = { id: uid(), nome, funcao, valor, obraId };
+    const novo = { id: uid(), nome, funcao, valor, obraId, cpf: cpfDigitos, dataNascimento: nascISO, ativo: ativoNovo };
     funcionarios.push(novo);
     const ok = await saveFuncionarios();
     if(!ok){ funcionarios = funcionarios.filter(f=>f.id !== novo.id); return; }
@@ -1323,6 +1442,9 @@
     $('w-funcao').value = '';
     $('w-valor').value = '';
     $('w-obra').value = '';
+    $('w-cpf').value = '';
+    $('w-nasc').value = '';
+    $('w-situacao').value = 'ativo';
     renderEquipe();
     renderFuncionarioSelect();
   });
@@ -1917,6 +2039,143 @@
     doc.save(nomeArquivo);
   }
 
+  // ---------- LISTA DE COLABORADORES (PDF) ----------
+  const listaSel = new Set();
+
+  function colaboradorCompleto(f){ return validarCPF(f.cpf) && !!f.dataNascimento; }
+
+  function renderLista(){
+    const liberado = !!(acesso && acesso.ativo);
+    $('lista-bloqueio').style.display = liberado ? 'none' : 'block';
+    $('lista-conteudo').style.display = liberado ? 'block' : 'none';
+    if(!liberado) return;
+    if(!$('l-emissao').value) $('l-emissao').value = todayISO();
+    $('l-obra-opcoes').innerHTML = obras.map(o=>`<option value="${escapeHtml(o.nome)}">`).join('');
+    const ativos = funcionarios.filter(f=>f.ativo !== false);
+    // remove da seleção quem deixou de estar ativo/completo
+    Array.from(listaSel).forEach(id=>{
+      const f = ativos.find(x=>x.id===id);
+      if(!f || !colaboradorCompleto(f)) listaSel.delete(id);
+    });
+    const termo = $('l-busca').value.trim().toLowerCase();
+    const box = $('lista-colab');
+    const visiveis = ativos
+      .filter(f=>!termo || f.nome.toLowerCase().includes(termo))
+      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    if(visiveis.length === 0){
+      box.innerHTML = '<div class="empty">Nenhum colaborador ativo encontrado.</div>';
+    } else {
+      box.innerHTML = '';
+      visiveis.forEach(f=>{
+        const ok = colaboradorCompleto(f);
+        const row = document.createElement('label');
+        row.className = 'sel-row' + (ok ? '' : ' incompleto');
+        row.innerHTML = `
+          <input type="checkbox" data-id="${f.id}" ${ok ? '' : 'disabled'} ${listaSel.has(f.id) ? 'checked' : ''}>
+          <div>
+            <div class="name">${escapeHtml(f.nome)}</div>
+            <div class="rate">${ok ? 'CPF ' + mascararCPF(f.cpf) + ' · ' + nascISOparaBR(f.dataNascimento) : 'CPF ou nascimento não preenchido — complete na aba Equipe'}</div>
+          </div>`;
+        box.appendChild(row);
+      });
+      box.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          if(cb.checked) listaSel.add(cb.dataset.id); else listaSel.delete(cb.dataset.id);
+          atualizarContadorLista();
+        });
+      });
+    }
+    atualizarContadorLista();
+  }
+
+  function atualizarContadorLista(){
+    const n = listaSel.size;
+    $('lista-contador').textContent = n === 0 ? 'Nenhum colaborador selecionado.' : (n === 1 ? '1 colaborador selecionado.' : n + ' colaboradores selecionados.');
+  }
+
+  $('l-busca').addEventListener('input', renderLista);
+  $('btn-ir-ajustes').addEventListener('click', ()=> document.querySelector('.tab-btn[data-view="ajustes"]').click());
+  $('btn-lista-todos').addEventListener('click', ()=>{
+    funcionarios.filter(f=>f.ativo !== false && colaboradorCompleto(f)).forEach(f=>listaSel.add(f.id));
+    renderLista();
+  });
+  $('btn-lista-nenhum').addEventListener('click', ()=>{ listaSel.clear(); renderLista(); });
+
+  $('btn-gerar-lista').addEventListener('click', async ()=>{
+    if(!(acesso && acesso.ativo)){ await showAlert('Ative a proteção por senha em Ajustes para emitir a lista.'); return; }
+    const obra = $('l-obra').value.trim();
+    const cliente = $('l-cliente').value.trim();
+    const emissao = $('l-emissao').value || todayISO();
+    if(!obra){ await showAlert('Informe a obra ou unidade.'); return; }
+    const itens = funcionarios
+      .filter(f=>listaSel.has(f.id) && f.ativo !== false && colaboradorCompleto(f))
+      .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    if(itens.length === 0){ await showAlert('Selecione ao menos um colaborador.'); return; }
+    gerarPDFListaAcesso(obra, cliente, emissao, itens);
+  });
+
+  function gerarPDFListaAcesso(obra, cliente, emissao, itens){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit:'mm', format:'a4' });
+    const L = 15, R = 195;
+    const colCPF = 112, colNasc = 160;
+
+    function cabecalhoTabela(y){
+      doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+      doc.text('Nome completo', L, y);
+      doc.text('CPF', colCPF, y);
+      doc.text('Data de nascimento', colNasc, y);
+      doc.setLineWidth(0.4); doc.line(L, y+2.5, R, y+2.5);
+      doc.setFont('helvetica','normal');
+      return y + 9;
+    }
+
+    try{ doc.addImage(LOGO_DATA_URL, 'PNG', L, 14, 42, 12); }catch(e){}
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text('LISTA DE COLABORADORES PARA LIBERAÇÃO DE ACESSO', L, 38, { maxWidth: R-L });
+
+    let y = 48;
+    doc.setFontSize(10.5);
+    const campo = (rotulo, valor)=>{
+      doc.setFont('helvetica','bold'); doc.text(rotulo, L, y);
+      doc.setFont('helvetica','normal');
+      const linhas = doc.splitTextToSize(String(valor), R-L-42);
+      doc.text(linhas, L+42, y);
+      y += 6 * linhas.length;
+    };
+    campo('Obra / unidade:', obra);
+    if(cliente) campo('Cliente / condomínio:', cliente);
+    campo('Data de emissão:', fmtDateBR(emissao));
+    y += 4;
+
+    y = cabecalhoTabela(y);
+    itens.forEach(f=>{
+      if(y > 275){ doc.addPage(); y = 20; y = cabecalhoTabela(y); }
+      doc.setFontSize(10.5);
+      const nomeLinhas = doc.splitTextToSize(String(f.nome), colCPF-L-4);
+      doc.text(nomeLinhas, L, y);
+      doc.text(fmtCPF(f.cpf), colCPF, y);
+      doc.text(nascISOparaBR(f.dataNascimento), colNasc, y);
+      const alt = 6 * nomeLinhas.length;
+      doc.setLineWidth(0.1); doc.setDrawColor(190);
+      doc.line(L, y+alt-3.5, R, y+alt-3.5);
+      doc.setDrawColor(0);
+      y += alt + 1;
+    });
+
+    const total = doc.getNumberOfPages();
+    for(let i=1; i<=total; i++){
+      doc.setPage(i);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(120);
+      doc.text(`Página ${i} de ${total}`, R, 290, { align:'right' });
+      doc.text('Documento com dados pessoais — uso restrito à liberação de acesso.', L, 290);
+      doc.setTextColor(0);
+    }
+
+    const slug = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    doc.save(`lista_colaboradores_${slug(obra)}_${emissao}.pdf`);
+  }
+
   // ---------- INIT ----------
   async function init(){
     $('f-data').value = todayISO();
@@ -1931,85 +2190,245 @@
     renderResumo();
   }
 
-  // ---------- LOGIN SEGURO (Firebase Authentication – e-mail e senha) ----------
-  function esperarUsuario(){
-    return new Promise(res=>{ const off = auth.onAuthStateChanged(u=>{ off(); res(u); }); });
+  // ---------- ACESSO (SENHA) ----------
+  let acesso = null; // {ativo, senha, pergunta, resposta}
+
+  async function loadAcesso(){
+    try{
+      const a = await storageGet('acesso');
+      acesso = a ? JSON.parse(a.value) : null;
+    }catch(e){ acesso = null; }
   }
-  function msgErroLogin(e){
-    const c = (e && e.code) || '';
-    if(/invalid-credential|wrong-password|user-not-found|invalid-login|invalid-email/.test(c)) return 'E-mail ou senha incorretos.';
-    if(/too-many-requests/.test(c)) return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
-    if(/network/.test(c)) return 'Sem conexão com a internet.';
-    if(/user-disabled/.test(c)) return 'Este acesso foi desativado.';
-    return 'Não foi possível entrar (' + (c || (e && e.message) || 'erro') + ').';
+  async function saveAcesso(){
+    try{
+      await storageSet('acesso', JSON.stringify(acesso));
+      return true;
+    }catch(e){
+      await showAlert('Não consegui salvar. Verifique sua internet e tente novamente. Se persistir, pode ser que o app ainda não esteja publicado — abra o "Compartilhar" no topo e publique.');
+      return false;
+    }
   }
-  function telaLoginSeguro(BOX, LOGO_SRC, TITULO, aoEntrar, erroMsg){
-    let lembrado = ''; try{ lembrado = localStorage.getItem('nupe_email') || ''; }catch(e){}
-    BOX.innerHTML = `
-      <div style="display:flex;justify-content:center;margin-bottom:16px"><img src="${LOGO_SRC}" alt="Nupe" style="height:30px"></div>
-      <h3>${TITULO}</h3>
-      <label for="lg-email">E-mail</label>
-      <input type="email" id="lg-email" autocomplete="username" value="${lembrado.replace(/"/g,'')}" placeholder="seu@email.com">
-      <label for="lg-senha">Senha</label>
-      <input type="password" id="lg-senha" autocomplete="current-password" placeholder="Sua senha">
-      <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13.5px;font-weight:500;color:#0D0D0D;margin-top:12px;cursor:pointer">
-        <input type="checkbox" id="lg-manter" checked style="width:20px;height:20px;margin:0"> Manter conectado neste aparelho
-      </label>
-      <div id="lg-erro" style="color:#B23B3B;font-size:12.5px;text-align:center;margin:10px 0 0;${erroMsg?'':'display:none'}">${erroMsg||''}</div>
-      <button class="primary" id="lg-entrar">Entrar</button>
-      <button id="lg-esqueci" style="display:block;margin:14px auto 0;background:none;border:none;font-size:12.5px;color:#535759;text-decoration:underline;cursor:pointer">Esqueci minha senha</button>`;
-    const erro = t => { const el = document.getElementById('lg-erro'); el.textContent = t; el.style.display = 'block'; el.style.color = '#B23B3B'; };
-    const entrar = async ()=>{
-      const email = document.getElementById('lg-email').value.trim(), senha = document.getElementById('lg-senha').value;
-      if(!email || !senha){ erro('Preencha e-mail e senha.'); return; }
-      const btn = document.getElementById('lg-entrar'); btn.disabled = true; btn.textContent = 'Entrando…';
-      try{
-        const manter = document.getElementById('lg-manter').checked;
-        await auth.setPersistence(manter ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-        await auth.signInWithEmailAndPassword(email, senha);
-        try{ localStorage.setItem('nupe_email', email); }catch(e){}
-        aoEntrar();
-      }catch(e){ btn.disabled = false; btn.textContent = 'Entrar'; erro(msgErroLogin(e)); }
-    };
-    document.getElementById('lg-entrar').onclick = entrar;
-    document.getElementById('lg-senha').onkeydown = e=>{ if(e.key==='Enter') entrar(); };
-    document.getElementById('lg-esqueci').onclick = async ()=>{
-      const email = document.getElementById('lg-email').value.trim();
-      if(!email){ erro('Digite seu e-mail acima e toque em "Esqueci minha senha" de novo.'); return; }
-      try{ await auth.sendPasswordResetEmail(email); const el = document.getElementById('lg-erro'); el.style.display='block'; el.style.color='#1F6E4A'; el.textContent = 'Enviamos um link para criar nova senha em ' + email + ' (confira também o spam).'; }
-      catch(e){ erro(msgErroLogin(e)); }
-    };
-  }
-  async function exigirLogin(BOX, LOGO_SRC, TITULO){
-    let u = await esperarUsuario();
-    if(u && u.isAnonymous){ try{ await auth.signOut(); }catch(e){} u = null; }
-    if(u) return u;
-    return new Promise(res=>{ telaLoginSeguro(BOX, LOGO_SRC, TITULO, ()=>res(auth.currentUser)); });
-  }
-  async function sair(){ try{ sessionStorage.clear(); }catch(e){} await auth.signOut(); location.reload(); }
 
   function unlockApp(){
     $('lock-screen').classList.add('hidden');
     init();
   }
-  async function iniciarAcesso(){
+
+  function telaLogin(erroMsg){
     $('lock-screen').classList.remove('hidden');
-    await exigirLogin($('lock-box-content'), LOGO_DATA_URL, 'Caderno de Diárias');
-    unlockApp();
+    $('lock-box-content').innerHTML = `
+      <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
+      <h3>Área protegida</h3>
+      <label for="login-senha">Senha</label>
+      <input type="password" id="login-senha" placeholder="Digite a senha">
+      <div class="erro" id="erro-login" style="${erroMsg ? 'display:block;' : ''}">${erroMsg || ''}</div>
+      <button class="primary" id="btn-login">Entrar</button>
+      <button class="link-esqueci" id="btn-esqueci">Esqueci minha senha</button>
+    `;
+    $('btn-login').addEventListener('click', ()=>{
+      const val = $('login-senha').value;
+      if(val === acesso.senha){
+        unlockApp();
+      } else {
+        telaLogin('Senha incorreta. Tente novamente.');
+      }
+    });
+    $('login-senha').addEventListener('keydown', (e)=>{ if(e.key==='Enter') $('btn-login').click(); });
+    $('btn-esqueci').addEventListener('click', ()=> telaRecuperar());
+  }
+
+  function telaRecuperar(erroMsg){
+    $('lock-box-content').innerHTML = `
+      <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
+      <h3>Recuperar acesso</h3>
+      <div class="lock-msg">${escapeHtml(acesso.pergunta)}</div>
+      <label for="rec-resposta">Sua resposta</label>
+      <input type="text" id="rec-resposta" placeholder="Digite a resposta">
+      <div class="erro" id="erro-rec" style="${erroMsg ? 'display:block;' : ''}">${erroMsg || ''}</div>
+      <button class="primary" id="btn-verificar">Verificar</button>
+      <button class="link-esqueci" id="btn-voltar-login">Voltar</button>
+    `;
+    $('btn-verificar').addEventListener('click', ()=>{
+      const val = $('rec-resposta').value.trim().toLowerCase();
+      if(val && val === acesso.resposta){
+        telaNovaSenha(true);
+      } else {
+        telaRecuperar('Resposta incorreta. Tente novamente.');
+      }
+    });
+    $('btn-voltar-login').addEventListener('click', ()=> telaLogin());
+  }
+
+  function telaNovaSenha(viaLockScreen){
+    $('lock-box-content').innerHTML = `
+      <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
+      <h3>Criar nova senha</h3>
+      <label for="nn-senha">Nova senha</label>
+      <input type="password" id="nn-senha" placeholder="Digite a nova senha">
+      <label for="nn-senha2">Confirmar nova senha</label>
+      <input type="password" id="nn-senha2" placeholder="Digite novamente">
+      <div class="erro" id="erro-nn"></div>
+      <button class="primary" id="btn-nova-senha">Salvar nova senha e entrar</button>
+    `;
+    $('btn-nova-senha').addEventListener('click', async ()=>{
+      const s1 = $('nn-senha').value;
+      const s2 = $('nn-senha2').value;
+      const erro = $('erro-nn');
+      if(!s1 || s1.length < 4){ erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; erro.style.display='block'; return; }
+      if(s1 !== s2){ erro.textContent = 'As senhas não são iguais.'; erro.style.display='block'; return; }
+      acesso.senha = s1;
+      await saveAcesso();
+      if(viaLockScreen){ unlockApp(); } else { renderAjustes(); }
+    });
+  }
+
+  async function iniciarAcesso(){
+    try{
+      await ensureAuth();
+    }catch(e){
+      $('lock-box-content').innerHTML = `
+        <div class="lock-logo"><img src="${LOGO_DATA_URL}" alt="Nupe"></div>
+        <h3>Não consegui conectar</h3>
+        <div class="lock-msg">
+          Este app precisa ser aberto por um endereço de site (http/https), não direto do arquivo baixado no computador.
+          Abra pelo link publicado no Claude, ou pelo endereço do site depois de subir na hospedagem.
+        </div>
+        <div class="lock-msg" style="font-family:monospace; font-size:11px; color:var(--danger); text-align:left; word-break:break-all;">
+          Detalhe técnico: ${escapeHtml(String(e && (e.code || e.message) || e))}
+        </div>
+      `;
+      return;
+    }
+    await loadAcesso();
+    if(acesso && acesso.ativo){
+      telaLogin();
+    } else {
+      $('lock-screen').classList.add('hidden');
+      unlockApp();
+    }
   }
 
   // ---------- AJUSTES ----------
   function renderAjustes(){
-    const u = auth.currentUser;
-    $('ajustes-status').innerHTML = `Conectado como: <strong>${escapeHtml(u && u.email ? u.email : '—')}</strong>`;
-    $('ajustes-conteudo').innerHTML = `
-      <button class="secondary" id="btn-trocar-senha-email">Trocar minha senha (recebo um link por e-mail)</button>
-      <button class="secondary" id="btn-sair" style="border-color:var(--danger);color:var(--danger)">Sair deste aparelho</button>`;
-    $('btn-trocar-senha-email').addEventListener('click', async ()=>{
-      try{ await auth.sendPasswordResetEmail(u.email); await showAlert('Enviamos um link para ' + u.email + ' para você criar uma nova senha. Confira também a caixa de spam.'); }
-      catch(e){ await showAlert(msgErroLogin(e)); }
+    const statusBox = $('ajustes-status');
+    const box = $('ajustes-conteudo');
+    const ativo = !!(acesso && acesso.ativo);
+    const temSenhaConfigurada = !!(acesso && acesso.senha);
+
+    statusBox.innerHTML = `Situação atual: <strong>${ativo ? 'senha ativada' : 'senha desativada'}</strong>`;
+
+    if(ativo){
+      box.innerHTML = `
+        <button class="secondary" id="btn-desativar-senha">Desativar senha</button>
+        <button class="secondary" id="btn-trocar-senha">Alterar senha</button>
+        <button class="secondary" id="btn-trocar-pergunta">Alterar pergunta de segurança</button>
+      `;
+      $('btn-desativar-senha').addEventListener('click', async ()=>{
+        if(!(await showConfirm('Desativar a senha? Qualquer pessoa com o link vai poder abrir o app sem digitar senha.'))) return;
+        acesso.ativo = false;
+        await saveAcesso();
+        renderAjustes();
+      });
+      $('btn-trocar-senha').addEventListener('click', ()=> formTrocarSenha());
+      $('btn-trocar-pergunta').addEventListener('click', ()=> formTrocarPergunta());
+    } else if(temSenhaConfigurada){
+      box.innerHTML = `
+        <div class="note" style="margin-top:0;">Já existe uma senha configurada (${escapeHtml(acesso.pergunta)}). Você pode reativá-la ou criar uma nova.</div>
+        <button class="primary" id="btn-reativar-senha">Reativar senha existente</button>
+        <button class="secondary" id="btn-nova-config">Configurar uma nova senha</button>
+      `;
+      $('btn-reativar-senha').addEventListener('click', async ()=>{
+        acesso.ativo = true;
+        await saveAcesso();
+        renderAjustes();
+      });
+      $('btn-nova-config').addEventListener('click', ()=> formConfigurarSenha());
+    } else {
+      box.innerHTML = `
+        <div class="note" style="margin-top:0;">Nenhuma senha configurada. Ative se quiser proteger o acesso ao app.</div>
+        <button class="primary" id="btn-configurar-senha">Ativar proteção por senha</button>
+      `;
+      $('btn-configurar-senha').addEventListener('click', ()=> formConfigurarSenha());
+    }
+  }
+
+  function formConfigurarSenha(){
+    const box = $('ajustes-conteudo');
+    box.innerHTML = `
+      <label for="cfg-senha">Senha</label>
+      <input type="password" id="cfg-senha" placeholder="Crie uma senha">
+      <label for="cfg-senha2">Confirmar senha</label>
+      <input type="password" id="cfg-senha2" placeholder="Digite a senha novamente">
+      <label for="cfg-pergunta">Pergunta de segurança (para o caso de esquecer)</label>
+      <input type="text" id="cfg-pergunta" placeholder="Ex: nome do nosso primeiro cliente?">
+      <label for="cfg-resposta">Resposta</label>
+      <input type="text" id="cfg-resposta" placeholder="Resposta da pergunta acima">
+      <div class="erro" id="erro-cfg"></div>
+      <button class="primary" id="btn-salvar-cfg">Ativar senha</button>
+      <button class="secondary" id="btn-cancelar-cfg">Cancelar</button>
+    `;
+    $('btn-salvar-cfg').addEventListener('click', async ()=>{
+      const senha = $('cfg-senha').value;
+      const senha2 = $('cfg-senha2').value;
+      const pergunta = $('cfg-pergunta').value.trim();
+      const resposta = $('cfg-resposta').value.trim();
+      const erro = $('erro-cfg');
+      if(!senha || senha.length < 4){ erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; erro.style.display='block'; return; }
+      if(senha !== senha2){ erro.textContent = 'As senhas não são iguais.'; erro.style.display='block'; return; }
+      if(!pergunta || !resposta){ erro.textContent = 'Preencha a pergunta e a resposta de segurança.'; erro.style.display='block'; return; }
+      acesso = { ativo:true, senha, pergunta, resposta: resposta.toLowerCase() };
+      await saveAcesso();
+      renderAjustes();
     });
-    $('btn-sair').addEventListener('click', async ()=>{ if(await showConfirm('Sair deste aparelho? Vai ser preciso digitar e-mail e senha de novo.')) sair(); });
+    $('btn-cancelar-cfg').addEventListener('click', ()=> renderAjustes());
+  }
+
+  function formTrocarSenha(){
+    const box = $('ajustes-conteudo');
+    box.innerHTML = `
+      <label for="ts-senha">Nova senha</label>
+      <input type="password" id="ts-senha" placeholder="Digite a nova senha">
+      <label for="ts-senha2">Confirmar nova senha</label>
+      <input type="password" id="ts-senha2" placeholder="Digite novamente">
+      <div class="erro" id="erro-ts"></div>
+      <button class="primary" id="btn-salvar-ts">Salvar nova senha</button>
+      <button class="secondary" id="btn-cancelar-ts">Cancelar</button>
+    `;
+    $('btn-salvar-ts').addEventListener('click', async ()=>{
+      const s1 = $('ts-senha').value;
+      const s2 = $('ts-senha2').value;
+      const erro = $('erro-ts');
+      if(!s1 || s1.length < 4){ erro.textContent = 'A senha precisa ter pelo menos 4 caracteres.'; erro.style.display='block'; return; }
+      if(s1 !== s2){ erro.textContent = 'As senhas não são iguais.'; erro.style.display='block'; return; }
+      acesso.senha = s1;
+      await saveAcesso();
+      renderAjustes();
+    });
+    $('btn-cancelar-ts').addEventListener('click', ()=> renderAjustes());
+  }
+
+  function formTrocarPergunta(){
+    const box = $('ajustes-conteudo');
+    box.innerHTML = `
+      <label for="tp-pergunta">Nova pergunta de segurança</label>
+      <input type="text" id="tp-pergunta" value="${escapeHtml(acesso.pergunta || '')}">
+      <label for="tp-resposta">Nova resposta</label>
+      <input type="text" id="tp-resposta" placeholder="Digite a resposta">
+      <div class="erro" id="erro-tp"></div>
+      <button class="primary" id="btn-salvar-tp">Salvar</button>
+      <button class="secondary" id="btn-cancelar-tp">Cancelar</button>
+    `;
+    $('btn-salvar-tp').addEventListener('click', async ()=>{
+      const pergunta = $('tp-pergunta').value.trim();
+      const resposta = $('tp-resposta').value.trim();
+      const erro = $('erro-tp');
+      if(!pergunta || !resposta){ erro.textContent = 'Preencha a pergunta e a resposta.'; erro.style.display='block'; return; }
+      acesso.pergunta = pergunta;
+      acesso.resposta = resposta.toLowerCase();
+      await saveAcesso();
+      renderAjustes();
+    });
+    $('btn-cancelar-tp').addEventListener('click', ()=> renderAjustes());
   }
 
   iniciarAcesso();
